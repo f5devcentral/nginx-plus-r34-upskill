@@ -6,7 +6,7 @@ order: 5
 
 ## Introduction
 
-:bangbang: Be sure your UDF deployment is using at least *SDE NGINX Plus R33 Upskilling (**version 20**)*
+:bangbang: Be sure your UDF deployment is using at least *SDE NGINX Plus R34 Upskilling (**version 20**)*
 
 We will be going through an interactive lab where you will be working on a scenario where the NGINX Plus instance
 and the NGINX Instance Manager (NIM) are completely air-gapped. This is a disconnected environment where the
@@ -27,7 +27,7 @@ The diagram below shows the component view and a main workflow one would do from
 
 ## Prerequisites
 
-1. NGINX R33 JWT
+1. NGINX R34 JWT
 
 ## Interactive Lab Part 2
 
@@ -45,7 +45,7 @@ complete these steps from a device that has internet connectivity.
 
 ### NIM activation
 
-Why is NIM being used in this scenario? Remember NGINX Plus R33 will require usage reports being sent to an F5 SaaS or
+Why is NIM being used in this scenario? Remember NGINX Plus R34 will require usage reports being sent to an F5 SaaS or
 NIM endpoint. Because NGINX Plus is air-gapped, we must use NIM as the endpoint.
 
 Why do we have to activate NIM? The scenario here also requires NIM to be air-gapped as well as NGINX Plus. The
@@ -76,7 +76,7 @@ Let's now go through the manual activation process.
 
 1. Log into the **Web Shell** of your **Jumphost**.
 
-1. We will save your NGINX R33 JWT as an environment variable for ease. This will be used as your auth token when making
+1. We will save your NGINX R34 JWT as an environment variable for ease. This will be used as your auth token when making
 REST API calls to the F5 Licensing Endpoint.
     ```shell
     export LICENSE=<PasteJWTValueHere>
@@ -194,7 +194,7 @@ endpoint.
 
 The prerequisites for installing NGINX Plus is already setup so all you need to do is install it.
 
-1. From UDF, open up a **Web Shell** for your **NGINX Plus R33 (Part 2)** instance.
+1. From UDF, open up a **Web Shell** for your **NGINX Plus R34 (Part 2)** instance.
 
 1. Install NGINX Plus by running the commands below.
     ```shell
@@ -264,10 +264,10 @@ following **mgmt** section. We will be doing the following:
     If you wish to use your own provided self-signed certificate, the configuration steps shown above where you set the
     `ssl_certificate` and `ssl_certificate_key` is similar to using a signed certificate. Remember to either load your
     root CA of your self-signed certificate into your system or set it in your NGINX config. The snippet below is an
-    example of configuring the NGINX R33 so it uses your root CA when usage reports are sent to NIM.
+    example of configuring the NGINX R34 so it uses your root CA when usage reports are sent to NIM.
 
     ```shell
-    $ cat /etc/nginx/nginx.conf # NGINX Plus R33 instance
+    $ cat /etc/nginx/nginx.conf # NGINX Plus R34 instance
     . . .
     mgmt {
         ssl_trusted_certificate /path/to/self/signed/root/ca.pem;
@@ -287,7 +287,7 @@ following **mgmt** section. We will be doing the following:
     guide.
     <br/>
     <br/>
-    So here, the root CA certificate is copied from NIM to the NGINX Plus R33 instance and set using the
+    So here, the root CA certificate is copied from NIM to the NGINX Plus R34 instance and set using the
     `ssl_trusted_certificate` directive. In additional to that, you also need to set the `ssl_name` to
     **manager-server**. An snippet of the **mgmt** block looks like the following.
 
@@ -320,7 +320,7 @@ following **mgmt** section. We will be doing the following:
     ```shell
     root@ip-10-1-1-5:~$ tail -f /var/log/nginx/error.log
     2024/10/31 07:20:58 [notice] 9833#9833: using the "epoll" event method
-    2024/10/31 07:20:58 [notice] 9833#9833: nginx/1.27.2 (nginx-plus-r33)
+    2024/10/31 07:20:58 [notice] 9833#9833: nginx/1.27.2 (nginx-plus-r34)
     2024/10/31 07:20:58 [notice] 9833#9833: built by gcc 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)
     2024/10/31 07:20:58 [notice] 9833#9833: OS: Linux 5.19.0-1026-aws
     2024/10/31 07:20:58 [notice] 9833#9833: getrlimit(RLIMIT_NOFILE): 1024:524288
@@ -338,7 +338,7 @@ Great now you've setup your NGINX Plus instance so that it reports to NIM!
 By this point:
 - NIM is licensed and activated.
 - The initial report is submitted to the F5 Licensing Endpoint.
-- NGINX Plus R33 is installed and is submitting usage reports to NIM.
+- NGINX Plus R34 is installed and is submitting usage reports to NIM.
 
 We now need to submit the usage reports from NIM to the F5 License Server. We will now outline the steps to do this
 below.
@@ -542,4 +542,4 @@ After completing this lab, can now:
 ## Up next
 
 Now that you understand how to configure the reporting endpoint, let's proceed to the next lab where we will work on
-a FixIt lab. [Click here](r33-6.mdx) to proceed to that.
+a FixIt lab. [Click here](r34-6.mdx) to proceed to that.

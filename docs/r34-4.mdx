@@ -6,14 +6,14 @@ order: 4
 
 ## Introduction
 
-:bangbang: Be sure your UDF deployment is using at least *SDE NGINX Plus R33 Upskilling (**version 20**)*
+:bangbang: Be sure your UDF deployment is using at least *SDE NGINX Plus R34 Upskilling (**version 20**)*
 
 In this lab, we will be going through a scenario where the NGINX Plus instance is in a network restricted environment.
 Since it does not have internet connectivity, it needs to be configured to use NIM as the usage report endpoint. This
 lab will go through configuring this environment where NIM has internet connectivity.
 
 The goal of this section will be to:
-- Become familiar configuring NGINX Plus R33 with NIM as the usage report endpoint.
+- Become familiar configuring NGINX Plus R34 with NIM as the usage report endpoint.
 
 The diagram below shows the component view of this lab.
 
@@ -45,14 +45,14 @@ admin / Password123!
 shown below.
 ![Connected NIM Licensed](media/interactive/9.png)
 
-### NGINX Plus R33
+### NGINX Plus R34
 
-Let's now proceed to installing NGINX Plus R33 and configuring the usage report endpoint to NIM instead of the default
+Let's now proceed to installing NGINX Plus R34 and configuring the usage report endpoint to NIM instead of the default
 F5 SaaS endpoint.
 
 The prerequisites for installing NGINX Plus is already complete so all you need to do is install it.
 
-1. From UDF, open up a **Web Shell** for your **NGINX Plus R33 (Part 1)** instance.
+1. From UDF, open up a **Web Shell** for your **NGINX Plus R34 (Part 1)** instance.
 
 1. Install NGINX Plus by running the commands below.
     ```shell
@@ -121,10 +121,10 @@ following **mgmt** section. We will be doing the following:
     If you wish to use your own provided self-signed certificate, the configuration steps shown above where you set the
     `ssl_certificate` and `ssl_certificate_key` is similar to using a signed certificate. Remember to either load your
     root CA of your self-signed certificate into your system or set it in your NGINX config. The snippet below is an
-    example of configuring the NGINX R33 so it uses your root CA when usage reports are sent to NIM.
+    example of configuring the NGINX R34 so it uses your root CA when usage reports are sent to NIM.
 
     ```shell
-    $ cat /etc/nginx/nginx.conf # NGINX Plus R33 instance
+    $ cat /etc/nginx/nginx.conf # NGINX Plus R34 instance
     . . .
     mgmt {
         ssl_trusted_certificate /path/to/self/signed/root/ca.pem;
@@ -144,7 +144,7 @@ following **mgmt** section. We will be doing the following:
     guide.
     <br/>
     <br/>
-    So here, the root CA certificate is copied from NIM to the NGINX Plus R33 instance and set using the
+    So here, the root CA certificate is copied from NIM to the NGINX Plus R34 instance and set using the
     `ssl_trusted_certificate` directive. In additional to that, you also need to set the `ssl_name` to
     **manager-server**. An snippet of the **mgmt** block looks like the following.
 
@@ -178,7 +178,7 @@ following **mgmt** section. We will be doing the following:
     ```shell
     root@plus1:/# tail -f /var/log/nginx/error.log
     2024/10/31 07:20:58 [notice] 9833#9833: using the "epoll" event method
-    2024/10/31 07:20:58 [notice] 9833#9833: nginx/1.27.2 (nginx-plus-r33)
+    2024/10/31 07:20:58 [notice] 9833#9833: nginx/1.27.2 (nginx-plus-r34)
     2024/10/31 07:20:58 [notice] 9833#9833: built by gcc 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)
     2024/10/31 07:20:58 [notice] 9833#9833: OS: Linux 5.19.0-1026-aws
     2024/10/31 07:20:58 [notice] 9833#9833: getrlimit(RLIMIT_NOFILE): 1024:524288
@@ -260,11 +260,11 @@ Nov 14 20:23:26 nim <DPM>[2667]: 2024-11-14T20:23:26.344Z	DEBUG	9813c201-6951-49
 ## Summary
 
 After completing this lab, you are now able to:
-1. On NGINX Plus R33, configure usage report endpoint to NIM
+1. On NGINX Plus R34, configure usage report endpoint to NIM
 1. View E&V logs on NGINX Plus and NGINX Instance Manager
 
 ## Up next
 
 Now that you understand how to configure the usage report endpoint where NIM has internet connectivity, let's proceed to
-the next lab where we will work on a lab where NIM is also disconnected like NGINX Plus. [Click here](r33-5.mdx) to
+the next lab where we will work on a lab where NIM is also disconnected like NGINX Plus. [Click here](r34-5.mdx) to
 proceed to that.

@@ -1,24 +1,24 @@
 ---
 title: FixIt Lab
-description: Upgrade to R33 from R32
+description: Upgrade to R34 from R32
 order: 6
 ---
 
 ## Introduction
 
-In this lab, we will be going through a scenario where you will need to upgrade NGINX Plus R32 to R33. Upgrading to R33
+In this lab, we will be going through a scenario where you will need to upgrade NGINX Plus R32 to R34. Upgrading to R34
 will introduce a breaking change.
 
 The goal of this section will be to
-- Become familiar with the upgrade process to R33 from an older NGINX Plus version.
+- Become familiar with the upgrade process to R34 from an older NGINX Plus version.
 
 ## FixIt Lab
 
-Let's now go through this scenario where you will upgrade a previous R32 release to R33.
+Let's now go through this scenario where you will upgrade a previous R32 release to R34.
 
 1. Open up a **Web Shell** to the **NGINX Plus R32 (FixIt)** instance in UDF.
 
-1. Run the following command to upgrade to R33.
+1. Run the following command to upgrade to R34.
     ```shell
     apt update
     apt upgrade -y nginx-plus
@@ -31,7 +31,7 @@ Let's now go through this scenario where you will upgrade a previous R32 release
 
     !!! NGINX Plus was not upgraded !!!
 
-    NGINX Plus R33 introduces a breaking change.
+    NGINX Plus R34 introduces a breaking change.
     Please read about new licensing scheme and required actions here:
 
     https://docs.nginx.com/solutions/about-subscription-licenses
@@ -100,7 +100,7 @@ root@plus-fixit:/# tail -f /var/log/nginx/error.log
 2024/11/08 18:29:45 [notice] 592#592: exit
 2024/11/08 18:29:45 [error] 19725#19725: invalid license token
 2024/11/08 18:35:11 [notice] 19815#19815: using the "epoll" event method
-2024/11/08 18:35:11 [notice] 19815#19815: nginx/1.27.2 (nginx-plus-r33)
+2024/11/08 18:35:11 [notice] 19815#19815: nginx/1.27.2 (nginx-plus-r34)
 2024/11/08 18:35:11 [notice] 19815#19815: built by gcc 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)
 2024/11/08 18:35:11 [notice] 19815#19815: OS: Linux 6.5.0-1023-aws
 2024/11/08 18:35:11 [notice] 19815#19815: getrlimit(RLIMIT_NOFILE): 1024:524288
@@ -132,19 +132,19 @@ Success! You can now proceed to configuring your NGINX Plus instance depending w
 
 ### Upgrading note
 
-If you've upgraded to R33 but **nginx* isn't able to reload because of an unknown directive that is new starting on R33,
+If you've upgraded to R34 but **nginx* isn't able to reload because of an unknown directive that is new starting on R34,
 try restarting instead of reloading. You may encounter a case where the **nginx** binary running in memory wasn't updated
 yet the binary you just installed is updated.
 
 ## Summary
 
 After completing this lab, you are now able to:
-1. Update to the R33 release.
+1. Update to the R34 release.
 
 ## Conclusion
 
-Thank you for your time on this upskill session for NGINX Plus R33.
+Thank you for your time on this upskill session for NGINX Plus R34.
 
 ## Feedback
 
-Do you have feedback? Please create a [new issue](https://github.com/f5devcentral/nginx-plus-r33-upskill/issues).
+Do you have feedback? Please create a [new issue](https://github.com/f5devcentral/nginx-plus-r34-upskill/issues).

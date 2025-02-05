@@ -1,12 +1,12 @@
 ---
-title: NGINX Plus R33 Introduction
-description: An introduction to the NGINX Plus R33 Release.
+title: NGINX Plus R34 Introduction
+description: An introduction to the NGINX Plus R34 Release.
 order: 1
 ---
 
 ## Welcome
 
-Welcome to the NGINX Plus R33 Upskill Lab.
+Welcome to the NGINX Plus R34 Upskill Lab.
 
 There will not be a live session for this upskill session and all content will be provided in this lab.
 
@@ -14,11 +14,11 @@ There will not be a live session for this upskill session and all content will b
 
 The goals of this upskill session is
 
-- Demonstrate licensing changes starting with NGINX Plus R33
+- Demonstrate licensing changes starting with NGINX Plus R34
 
 ---
 
-## NGINX Plus R33
+## NGINX Plus R34
 
 ### Background
 
@@ -42,7 +42,7 @@ generate the report manually and submit it to the F5 licensing endpoint.
 
 ### Workflow
 
-Starting on R33, there will be two aspects that will be enforced. We will go over workflow details of Entitlement &
+Starting on R34, there will be two aspects that will be enforced. We will go over workflow details of Entitlement &
 Visibility (E&V).
 
 1. A valid JWT that is less than 90-days must be present for **nginx** to start.
@@ -92,7 +92,7 @@ Some key points here are:
 
 ### Data Reported by NGINX
 
-NGINX Plus will collect and report following data starting with R33. This data is encrypted and sent from each NGINX instance to
+NGINX Plus will collect and report following data starting with R34. This data is encrypted and sent from each NGINX instance to
 the F5 licensing endpoint or NIM which can then send the data to the F5 licensing endpoint or the Administrator can manually
 generate the report and submit it to F5. The usage report contains the following list of metrics.
 
@@ -124,9 +124,9 @@ Additional resources is required to submit usage reports, either you manually do
 
 Take a look at the diagram below that shows the entire view of the options we went over.
 
-![R33 License Options](media/intro/1.png)
+![R34 License Options](media/intro/1.png)
 
-From the perspective of the NGINX Plus R33 instance, two endpoints are available for usage reports:
+From the perspective of the NGINX Plus R34 instance, two endpoints are available for usage reports:
 1. Using the SaaS endpoint, **product.connect.nginx.com**
 1. Using an on-prem NIM endpoint
 
@@ -202,7 +202,7 @@ submitting the usage report because both the NGINX instance and NIM do not have 
 
 ### Fix it
 
-The last portion will be the Fix It Lab where you do an upgrade from NGINX Plus R32 to R33.
+The last portion will be the Fix It Lab where you do an upgrade from NGINX Plus R32 to R34.
 
 ### Environment
 
@@ -212,11 +212,11 @@ The diagram of the lab environment is shown below.
 
 This UDF Blue Print contains the following systems.
 1. Jumphost
-1. NGINX Plus Instance R33 (for interactive lab part 1)
-1. NGINX Plus Instance R33 (for interactive lab part 2)
+1. NGINX Plus Instance R34 (for interactive lab part 1)
+1. NGINX Plus Instance R34 (for interactive lab part 2)
 1. (Connected) NGINX Instance Manager 2.18
 1. (Disconnected) NGINX Instance Manager 2.18
-1. NGINX Plus Instance R32 (for R32 to R33 upgrade)
+1. NGINX Plus Instance R32 (for R32 to R34 upgrade)
 
 > :warning: **Note:** The UDF environment does not support a true disconnected environment. So when we do the
 interactive lab, we will go through steps as if NGINX Plus and NIM are fully disconnected to the internet but do note
@@ -226,7 +226,7 @@ they have internet connectivity.
 
 ## Use Cases
 
-For the NGINX Plus R33 release, there will only be one main use case:
+For the NGINX Plus R34 release, there will only be one main use case:
 
 1. Entitlement and Visibility (E&V), aka licensing NGINX Plus
 
@@ -236,19 +236,19 @@ In each of the labs, we will be going over the different ways of handing E&V:
 1. NGINX Plus in a network restrictive environment connecting to
     - NIM with internet connectivity
     - NIM also in a network restrictive environment
-1. Handing upgrade to NGINX Plus R33
+1. Handing upgrade to NGINX Plus R34
 
 ---
 
 ## Additional information
 
 We are basing most of the information of this lab from the following sources.
-- [NGINX Plus R33 Pre-release Guidance](https://docs.nginx.com/solutions/)
-- [NGINX Plus R33 Subscription License](https://docs.nginx.com/solutions/about-subscription-licenses/)
+- [NGINX Plus R34 Pre-release Guidance](https://docs.nginx.com/solutions/)
+- [NGINX Plus R34 Subscription License](https://docs.nginx.com/solutions/about-subscription-licenses/)
 - [NIM - Offline Installation](https://docs.nginx.com/nginx-instance-manager/disconnected/offline-install-guide/)
 - [NIM - Offline License and Activation](https://docs.nginx.com/nginx-instance-manager/disconnected/add-license-disconnected-deployment/)
 - [NIM - Report Usage Offline](https://docs.nginx.com/nginx-instance-manager/disconnected/report-usage-disconnected-deployment/)
 
 ## Up next
 
-Since the JWT is a focus of this release, let's get through the steps of getting it by [clicking here](r33-2.mdx).
+Since the JWT is a focus of this release, let's get through the steps of getting it by [clicking here](r34-2.mdx).

@@ -13,7 +13,7 @@ configure NGINX Plus to submit usage reports directly to the F5 licensing endpoi
 
 ## Demo Lab
 
-Remember there are two areas introduced in NGINX Plus R33:
+Remember there are two areas introduced in NGINX Plus R34:
 1. You must have a valid JWT and that JWT must be within the 90-day grace period for NGINX to start.
 1. Once NGINX is started, a report must be submitted with an interval of at most 180 days.
 
@@ -31,18 +31,18 @@ This demo video will show the following parts:
 
 Click on the link below which will take you to the demo video.
 
-[Demo: NGINX R33 Instance with Internet Connectivity](https://f5u.csod.com/ui/lms-learning-details/app/video/77086780-e0ce-4907-8fbb-43cb51d1836c)
+[Demo: NGINX R34 Instance with Internet Connectivity](https://f5u.csod.com/ui/lms-learning-details/app/video/77086780-e0ce-4907-8fbb-43cb51d1836c)
 
 > You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
 
-### NGINX Plus R33 on cloud
+### NGINX Plus R34 on cloud
 
 Clouds such as AWS and Azure have a subscription model in place so you will not need to worry about Entitlement &
 Visibility (E&V). Reporting is also automatically disabled.
 
-### NGINX Plus R33 in container
+### NGINX Plus R34 in container
 
-There are available environment variables relating to E&V when running NGINX Plus R33 as a container listed below.
+There are available environment variables relating to E&V when running NGINX Plus R34 as a container listed below.
 
 | Variable | Default |
 | -------- | ------- |
@@ -50,13 +50,13 @@ There are available environment variables relating to E&V when running NGINX Plu
 | NGINX_LICENSE_ENDPOINT_VERIFY | `yes` |
 | NGINX_LICENSE_JWT | `/etc/nginx/license.jwt` |
 
-An example of running NGINX Plus R33 in docker is below.
+An example of running NGINX Plus R34 in docker is below.
 
 ```shell
 docker run -v $(PWD)/my-nginx-plus.jwt:/etc/nginx/license.jwt \
   -e NGINX_LICENSE_ENDPOINT="nim.mycompany.local" \
   -e NGINX_LICENSE_ENDPOINT_VERIFY=off
-  private-registry.nginx.com/nginx-plus/base:nginx-plus-r33-debian-bookworm
+  private-registry.nginx.com/nginx-plus/base:nginx-plus-r34-debian-bookworm
 ```
 
 ## Summary
@@ -70,4 +70,4 @@ After watching this video, you now:
 
 Now that you understand how to configure the reporting endpoint, let's proceed to the next lab where we will walk through
 a scenario where the NGINX Plus instance does not have internet connectivity but an NGINX Instance Manager does.
-[Click here](r33-4.mdx) to proceed to that.
+[Click here](r34-4.mdx) to proceed to that.
