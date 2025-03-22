@@ -1,73 +1,35 @@
 ---
-title: Demo Lab
-description: License NGINX Plus in a connected environment
+title: Support for SSL certificate caching for the forward proxy
+description: Instructions for configuring SSL certificate caching for the
+forward proxy
 order: 3
 ---
 
 ## Introduction
 
-We will be going through a demo where you are in an environment connected to the internet. And because of this, we
-configure NGINX Plus to submit usage reports directly to the F5 licensing endpoint.
+This section will go through steps for how you would obtain the JWT to license NGINX Plus R34 from
+[MyF5](https://www.myf5.com).
 
-![NGINX Plus connected to internet](media/demo/1.png)
+## JWT for NGINX Plus
 
-## Demo Lab
+Starting on NGINX Plus R34, you are required to use a valid JWT in order to use this. Take the following steps below
+to get it.
 
-Remember there are two areas introduced in NGINX Plus R34:
-1. You must have a valid JWT and that JWT must be within the 90-day grace period for NGINX to start.
-1. Once NGINX is started, a report must be submitted with an interval of at most 180 days.
+1. Go to [MyF5](https://www.myf5.com) and sign in (or sign up if you do not have a MyF5 account).
+1. On top of the page select **MY PRODUCTS & PLAN** then **Subscriptions**.
+![Navigate to subscription](media/jwt/1.png)
 
-This demo video will show the following parts:
-1. Configuring NGINX Plus to connect to the F5 license endpoint
-1. Show the new NGINX Plus behavior in regards to the JWT license
-    - NGINX Plus startup without a JWT
-    - NGINX Plus behavior as the expiration date nears
-1. Show NGINX Plus behavior in regards to submitting the usage report
-    - NGINX Plus behavior when a failure occurs when submitting the usage report but you are within the 180-day grace
-    period
-    - NGINX Plus behavior after the 180-day grace period
+1. Find your **NGINX** subscription and select it.
+![Select NGINX subscription](media/jwt/2.png)
 
-<br/>
+1. You will be on a page where you can either **Copy** or **Download** your JWT in the *Subscription Details* section.
+![Download or copy JWT](media/jwt/3.png)
 
-Click on the link below which will take you to the demo video.
+> If you are a customer and do not see a JWT to copy or download, reach out to your sales or support contact.
 
-[Demo: NGINX R34 Instance with Internet Connectivity](https://f5u.csod.com/ui/lms-learning-details/app/video/77086780-e0ce-4907-8fbb-43cb51d1836c)
+> If you do not see a subscription for NGINX for internal training, go to [this page](https://go/sde-r34-jwt) for
+information on how to get it, **VPN** required. Follow steps for option 1.
 
-> You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
+## Up Next
 
-### NGINX Plus R34 on cloud
-
-Clouds such as AWS and Azure have a subscription model in place so you will not need to worry about Entitlement &
-Visibility (E&V). Reporting is also automatically disabled.
-
-### NGINX Plus R34 in container
-
-There are available environment variables relating to E&V when running NGINX Plus R34 as a container listed below.
-
-| Variable | Default |
-| -------- | ------- |
-| NGINX_LICENSE_ENDPOINT | `product.connect.nginx.com` |
-| NGINX_LICENSE_ENDPOINT_VERIFY | `yes` |
-| NGINX_LICENSE_JWT | `/etc/nginx/license.jwt` |
-
-An example of running NGINX Plus R34 in docker is below.
-
-```shell
-docker run -v $(PWD)/my-nginx-plus.jwt:/etc/nginx/license.jwt \
-  -e NGINX_LICENSE_ENDPOINT="nim.mycompany.local" \
-  -e NGINX_LICENSE_ENDPOINT_VERIFY=off
-  private-registry.nginx.com/nginx-plus/base:nginx-plus-r34-debian-bookworm
-```
-
-## Summary
-
-After watching this video, you now:
-1. Understand how to configure the endpoint where the usage report is submitted.
-1. Understand NGINX Plus with the JWT.
-1. Understand NGINX Plus behavior with submitting the usage report.
-
-## Up next
-
-Now that you understand how to configure the reporting endpoint, let's proceed to the next lab where we will walk through
-a scenario where the NGINX Plus instance does not have internet connectivity but an NGINX Instance Manager does.
-[Click here](r34-4.mdx) to proceed to that.
+The next section will cover enhanced logging for healthcheck failures.
