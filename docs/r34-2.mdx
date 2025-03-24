@@ -1,33 +1,39 @@
 ---
-title: Support for forward proxy for NGINX telemetry transmission
+title: Forward Proxy Support for E&V
 description: Instructions for configuring a forward proxy for telemetry transmission
 order: 2
 ---
 
 ## Introduction
 
-This section will go through steps for how you would obtain the JWT to license NGINX Plus R34 from
-[MyF5](https://www.myf5.com).
+This section will go through steps for how to setup forward proxy support for E&V.
 
-## JWT for NGINX Plus
+## Configure E&V to use a forward proxy
 
-Starting on NGINX Plus R34, you are required to use a valid JWT in order to use this. Take the following steps below
-to get it.
+Assuming that a forward proxy configured at nginx-forward-proxy.lab.f5npi,
+listening on port 8888, add the following line to the mgmt{} section of
+/etc/nginx.conf:
 
-1. Go to [MyF5](https://www.myf5.com) and sign in (or sign up if you do not have a MyF5 account).
-1. On top of the page select **MY PRODUCTS & PLAN** then **Subscriptions**.
-![Navigate to subscription](media/jwt/1.png)
+```shell
+   proxy nginx-forward-proxy.lab.f5npi.net:8888;
+```
+Restart NGINX Plus R34:
 
-1. Find your **NGINX** subscription and select it.
-![Select NGINX subscription](media/jwt/2.png)
+```shell
+systemctl restart nginx
+```
 
-1. You will be on a page where you can either **Copy** or **Download** your JWT in the *Subscription Details* section.
-![Download or copy JWT](media/jwt/3.png)
+Confirm success in the nginx-plus error log:
 
-> If you are a customer and do not see a JWT to copy or download, reach out to your sales or support contact.
+```shell
+tail /var/log/nginx/error.log
+```
 
-> If you do not see a subscription for NGINX for internal training, go to [this page](https://go/sde-r34-jwt) for
-information on how to get it, **VPN** required. Follow steps for option 1.
+Example output:
+
+```shell
+2025/03/24 14:07:06 [error] 1063#1063: proxy returned 400 during usage report to product.connect.nginx.com (via 10.1.1.9:8888)
+```
 
 ## Up Next
 
