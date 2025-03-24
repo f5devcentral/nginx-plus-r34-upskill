@@ -1,36 +1,63 @@
 ---
-title: Support for forward proxy for NGINX usage telemetry transmission
+title: Forward Proxy Support for E&V Demo
 description: Instructions for configuring a forward proxy for telemetry transmission
 order: 2
 ---
 
 ## Introduction
 
-This section will go through steps for how you would obtain the JWT to license NGINX Plus R34 from
-[MyF5](https://www.myf5.com).
+We will be going through a demo where you are in an environment that includes a
+simple forward proxy that will forward E&V requests for NGINX Plus R34 on
+another node.
 
-## JWT for NGINX Plus
 
-Starting on NGINX Plus R34, you are required to use a valid JWT in order to use this. Take the following steps below
-to get it.
+![NGINX Plus Forward Proxy Support for E&V](media/demo/1.png)
 
-1. Go to [MyF5](https://www.myf5.com) and sign in (or sign up if you do not have a MyF5 account).
-1. On top of the page select **MY PRODUCTS & PLAN** then **Subscriptions**.
-![Navigate to subscription](media/jwt/1.png)
+## Demo Lab
 
-1. Find your **NGINX** subscription and select it.
-![Select NGINX subscription](media/jwt/2.png)
+This demo video will show the following parts:
+1. Configuring NGINX Plus to use a forward proxy for E&V transmission
+1. Confirm success by viewing the output of the NGINX Plus logs
 
-1. You will be on a page where you can either **Copy** or **Download** your JWT in the *Subscription Details* section.
-![Download or copy JWT](media/jwt/3.png)
+<br/>
 
-> If you are a customer and do not see a JWT to copy or download, reach out to your sales or support contact.
+Click on the link below which will take you to the demo video.
 
-> If you do not see a subscription for NGINX for internal training, go to [this page](https://go/sde-r34-jwt) for
-information on how to get it, **VPN** required. Follow steps for option 1.
+[Demo: NGINX R34 Forward Proxy Support forE&V](https://f5u.csod.com/REPLACE-WITH-ViDEO-LINK)
+
+> You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
+
+
+## Configuration details
+
+In this demo, a forward proxy is configured at nginx-forward-proxy.lab.f5npi,
+listening on port 8888.
+
+Add the following line to the mgmt{} section of
+/etc/nginx.conf:
+
+```shell
+   proxy nginx-forward-proxy.lab.f5npi.net:8888;
+```
+Restart NGINX Plus R34:
+
+```shell
+systemctl restart nginx
+```
+
+Confirm success in the nginx-plus error log:
+
+```shell
+tail /var/log/nginx/error.log
+```
+
+Example output:
+
+```shell
+2025/03/24 14:07:06 [error] 1063#1063: proxy returned 400 during usage report to product.connect.nginx.com (via 10.1.1.9:8888)
+```
 
 ## Up Next
 
-You now have the JWT required for NGINX Plus R34 and can proceed to the Demo labs where we demonstrate how to configure
-the endpoint for submitting the usage report on your NGINX Plus instance connected to the internet. In addition to that,
-we demonstrate different behaviors throughout the Entitlement & Viability process. [Click here](r34-3.mdx) to proceed.
+In addition to the forward proxy use case, SSL certificate caching for the proxy
+will be demonstrated in the next section.
