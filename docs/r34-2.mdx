@@ -1,17 +1,39 @@
 ---
-title: Forward Proxy Support for E&V
+title: Forward Proxy Support for E&V Demo
 description: Instructions for configuring a forward proxy for telemetry transmission
 order: 2
 ---
 
 ## Introduction
 
-This section will go through steps for how to setup forward proxy support for E&V.
+We will be going through a demo where you are in an environment that includes a
+simple forward proxy that will forward E&V requests for NGINX Plus R34 on
+another node.
 
-## Configure E&V to use a forward proxy
 
-Assuming that a forward proxy configured at nginx-forward-proxy.lab.f5npi,
-listening on port 8888, add the following line to the mgmt{} section of
+![NGINX Plus Forward Proxy Support for E&V](media/demo/1.png)
+
+## Demo Lab
+
+This demo video will show the following parts:
+1. Configuring NGINX Plus to use a forward proxy for E&V transmission
+1. Confirm success by viewing the output of the NGINX Plus logs
+
+<br/>
+
+Click on the link below which will take you to the demo video.
+
+[Demo: NGINX R34 Forward Proxy Support forE&V](https://f5u.csod.com/REPLACE-WITH-ViDEO-LINK)
+
+> You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
+
+
+## Configuration details
+
+In this demo, a forward proxy is configured at nginx-forward-proxy.lab.f5npi,
+listening on port 8888.
+
+Add the following line to the mgmt{} section of
 /etc/nginx.conf:
 
 ```shell
