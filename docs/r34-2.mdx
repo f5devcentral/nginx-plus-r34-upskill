@@ -29,14 +29,14 @@ Click on the link below which will take you to the demo video.
 
 ## Configuration
 
-In this demo, a forward proxy is configured at nginx-forward-proxy.lab.f5npi,
+In this demo, a forward proxy is configured at nginx-forward-proxy.local,
 listening on port 8888.
 
 Add the following line to the mgmt{} section of
 /etc/nginx.conf:
 
 ```shell
-   proxy nginx-forward-proxy.lab.f5npi.net:8888;
+   proxy nginx-forward-proxy.local:8888;
 ```
 Restart NGINX Plus R34:
 
@@ -53,10 +53,18 @@ tail /var/log/nginx/error.log
 Example output:
 
 ```shell
-2025/03/24 14:07:06 [error] 1063#1063: proxy returned 400 during usage report to product.connect.nginx.com (via 10.1.1.9:8888)
+025/03/25 17:15:15 [notice] 1027#1027: using the "epoll" event method
+2025/03/25 17:15:15 [notice] 1027#1027: nginx/1.27.4 (nginx-plus-r34)
+2025/03/25 17:15:15 [notice] 1027#1027: built by gcc 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04) 
+2025/03/25 17:15:15 [notice] 1027#1027: OS: Linux 6.8.0-1024-aws
+2025/03/25 17:15:15 [notice] 1027#1027: getrlimit(RLIMIT_NOFILE): 1024:524288
+2025/03/25 17:15:15 [notice] 1028#1028: start worker processes
+2025/03/25 17:15:15 [notice] 1028#1028: start worker process 1029
+2025/03/25 17:15:15 [notice] 1028#1028: start worker process 1030
+2025/03/25 17:15:15 [info] 1029#1029: usage report was sent
 ```
 
 ## Up Next
 
-In addition to the forward proxy use case, SSL certificate caching for the proxy
+In addition to the forward proxy use case, SSL certificate caching
 will be demonstrated in the next section.
