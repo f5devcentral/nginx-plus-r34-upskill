@@ -3,31 +3,71 @@ title: Native OIDC implementation
 description: Instructions for configuring the native OIDC implementation
 failures
 forward proxy
+access management
+session management
 order: 5
 ---
 
 ## Introduction
 
-This section will go through steps for how you would obtain the JWT to license NGINX Plus R34 from
-[MyF5](https://www.myf5.com).
+NGNIX Plus r34 contains a new native [OpenID Connect](https://openid.net/developers/how-connect-works/) implementation.
+The following are supported:
 
-## JWT for NGINX Plus
+* OpenID Connect **Relying Party**
+* OpenID Connect **Client**
 
-Starting on NGINX Plus R34, you are required to use a valid JWT in order to use this. Take the following steps below
-to get it.
+This new implementation is intended to replace the 
+NGINX Inc [nginx-openid-connect Reference Implementation](https://github.com/nginxinc/nginx-openid-connect) with a native and 
+supported solution.
 
-1. Go to [MyF5](https://www.myf5.com) and sign in (or sign up if you do not have a MyF5 account).
-1. On top of the page select **MY PRODUCTS & PLAN** then **Subscriptions**.
-![Navigate to subscription](media/jwt/1.png)
+This document discusses the purpose of the feature and provides information for implementors and engineers supporting it.
 
-1. Find your **NGINX** subscription and select it.
-![Select NGINX subscription](media/jwt/2.png)
+---
 
-1. You will be on a page where you can either **Copy** or **Download** your JWT in the *Subscription Details* section.
-![Download or copy JWT](media/jwt/3.png)
+### What does this feature do?
 
-> If you are a customer and do not see a JWT to copy or download, reach out to your sales or support contact.
+This feature allows NGINX Plus to be used to enforce logon requirements as a web server or proxy in front of a website.
+For example, the website or proxy owners may want to enforce a logon from Azure, Okta, Duo, or other OpenID Connect Identity Provider.
+Identity Provider (IdP) is sometimes also called **Authorization Server*** (AS).
 
-> If you do not see a subscription for NGINX for internal training, go to [this page](https://go/sde-r34-jwt) for
-information on how to get it, **VPN** required. Follow steps for option 1.
+Because web browsers do not (yet) support OpenID Connect directly, a web site or app must behave as a *proxy* for this access on the 
+browser's behalf. Typically the OpenID Connect Client provides an 
+[HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session
 
+### What features are missing that may be expected?
+
+The initial implementation of this feature is missing the following items that may limit deployment:
+
+* Proof of Key Code Exchange [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) support. Administrators must preconfigure a 
+Client Secret to bypass this limitation. This type of configuration known as a "private app" or "confidential client", 
+as opposed to a "public client" which does not require a pre-shared client secret.
+* Logout Support. NGINX's OIDC CLient tracks user sessions with a session cookie There is no mechnaism to terminate or invalidate these user sessions.
+* Support for Opaque Tokens. NGINX Plus's OIDC Client relies on **JWKs** to validate incoming JWTs from the AS. It does not support [introspect endpoints](https://www.rfc-editor.org/rfc/rfc7662.html).
+* Dynamic JWK updating. **JWKs** are used to validate JWTs. Providers rotate these on a regular basis.
+* Session ID Rotation. NGINX Plus's OIDC Client provides a single unchanging session cookie.
+
+### Common Security Questions
+
+How is the SID generated
+How are the JWKs updated
+What is SID timeout
+How are user JWT claims stored and encrypted
+
+
+
+## Use Case: Configure Microsoft Azure AD aka Entra AD DS
+
+In this section, we'll go through creating a lab with Azure AD.
+
+* Register an account with Microsoft
+* Create an App Registration
+
+### Register an account with Microsoft
+
+You must obtain or have an account with Microsoft to use Azure services. This may require a credit card and user registration.
+
+### Create an App Registration
+
+To create an app registration with Azure, navigate to App Registrations
+
+<img src="media/oidc/azure-app-reg-1.png" width=50% alt="App Registration selection in Azure Portal"/>
