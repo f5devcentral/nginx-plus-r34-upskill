@@ -17,6 +17,7 @@ This new implementation is intended to replace the NGINX Inc [nginx-openid-conne
 
 This document discusses the purpose of the feature and provides information for implementors and engineers supporting it.
 
+&nbsp;
 
 ## What does this feature do?
 
@@ -24,7 +25,7 @@ This feature allows NGINX Plus to **authenticate** users and **obtain claims dat
 
 For example, the website or proxy owners may want to enforce a logon from **Azure**, **Okta**, **Duo**, or other **OpenID Connect AS** before accessing protected content. The site owners may also wish to operate on user information ([claims](https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-token-claims)) provided by the OpenID Connect AS, such as the user's name, email address, profile picture, group data, and the like.
 
-The feature is required for web-based federated OAuth logins because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a *proxy* for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentictaion Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
+Unlike traditional HTTP or SAML authentication, OAuth requires a 3rd party *OpenID Connect Client* because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a *proxy* for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentictaion Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
 
 &nbsp;
 
@@ -57,22 +58,37 @@ It may be easiest to understand this feature by contrasting it with a typical di
 
 ### Typical OpenID Connect Architecture
 
-* User: User's web browser
-* Resource Server: Validates Tokens, Operates on Token Claim Data, Provides Browser-based App Experience
-* OpenID Connect Client: Validates Authentication Server, Obtains and Stores Tokens 
-* Authentication Server: Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience
+```mermaid
+%%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%%
+graph TD
+    User["<b>User</b><br>User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"]
+    User --> OpenIDClient["<b>OpenID Connect Client</b><br>Validates Authentication Server, Obtains and Stores Tokens"]
+    OpenIDClient --> AuthServer
+    OpenIDClient --> ResourceServer["<b>Resource Server</b><br>Validates Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"]
+```
 
 In a typical client architecture, the *Resource Server* and the *OpenID Connect Client* are two separate components that do not share a datastore. The OpenID Connect Client authenticates the Authentication Server using a standard HTTPS connection. The Resource Server then authenticates the Authentication Server indirectly by cryptographic validation of JSON Web Tokens provided by the OpenID Connect Client with JSON Web Keys provided by the Authentication Server. This indirection provides JWT portability, but incurs additional configuration overhead and computational complexity. 
 
+&nbsp;
 
 ### NGINX OpenID Connect Client Anchitecture
 
-* User: User's web browser
-* NGINX Plus: Validates Authentication Server, Obtains and Stores Tokens, Operates on Token Claim Data, Provides Browser-based App Experience
-* Authentication Server: Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience
+
+<img src="media/5-oidc/nginx-oidc-architecture.png" width="35%"/>
+
+/*
+%%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%%
+graph TD
+    User["User: User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"]
+    User --> NGINXPlus["OpenID Connect Client: Validates Authentication Server, Obtains and Stores Tokens"]
+    NGINXPlus --> AuthServer
+    NGINXPlus["<b>NGINX Plus</b><br>Validates Authentication Server, Obtains and Stores Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"]
+*/
+
 
 NGINX Plus' combined system establishes the root of trust using the Authentication Server's certificate in the HTTPS connection during retrieval of the [well-known OAuth metadata](https://datatracker.ietf.org/doc/html/rfc8414) and the subsequent retrieval of the JWT ID Token and Bearer Token. Because the tokens are stored and operated on inside NGINX Plus itself, they do not require additional validation by an external Resource Server. The user's session is tracked using a standard HTTP cookie, and the authenticated JWTs are used during the session. 
 
+&nbsp;
 
 ### NGINX Plus OpenID Connect Client Data Flow
 
@@ -106,13 +122,17 @@ sequenceDiagram
 
 ```
 
+&nbsp;
+
 ---
 
 ### Session Lifetime
 
-NGINX holds tokens for the amount of time specified in the [```session_timeout```](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#session_timeout) directive, defaulting to 8 hours.
+NGINX holds user sessions for the amount of time specified in the [```session_timeout```](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#session_timeout) directive, defaulting to 8 hours.
 
 If a token is refreshed, the timeout is reset. Upon refresh failure, the token entry is removed and the user redirected to the ```authorize``` endpoint.
+
+&nbsp;
 
 #### Token Refresh
 
@@ -123,6 +143,8 @@ NGINX will automatically attempt a Token Refresh upon receiving a new web reques
 
 If a token refresh fails for some reason, the authentication starts over and the user is redirected to the AS's Authorize endpoint to get another tokencode.
 
+&nbsp;
+
 ### What features are not implemented that may be expected?
 
 * Proof of Key Code Exchange [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) support. Administrators must preconfigure a 
@@ -130,8 +152,9 @@ Client Secret to bypass this limitation. This type of configuration known as a "
 as opposed to a "public client" which does not require a pre-shared client secret.
 * Client-Side Logout Support. NGINX's OIDC feature tracks user sessions with a session cookie. Users may remove their sessions by deleting it, typically by closing their browser tab. An alternate solution is listed under **A Simple Logout Workaround** in the DevCentral article [Simplifying OIDC and SSO with the New NGINX Plus R34 OIDC Module](https://community.f5.com/kb/technicalarticles/simplifying-oidc-and-sso-with-the-new-nginx-plus-r34-oidc-module/340552).
 * Server-Side Logout Support. There is no supported mechanism for administrators to list, query, or terminate user sessions. To delete the session database, stop and start the NGINX server.
-* JWT Signature Validation. Because NGINX Plus's unique hybrid OIDC authentication mechanism establishes trust by validating the SSL certificate of the Authorization Server, it is not necessary to validate the signatures of the JWTs themselves against a JWK. If NGINX is instead used in a JWT-aware *Resource Server* capacity, JWT validation is necessary and implementors may use the [ngx_http_auth_jwt_module](https://nginx.org/en/docs/http/ngx_http_auth_jwt_module.html).
+* JWT Signature Validation. Because NGINX Plus's unique hybrid OIDC authentication mechanism establishes trust by validating the SSL certificate of the Authorization Server directly, it is not necessary to validate the signatures of the JWTs themselves against a JWK. If NGINX is instead used in a JWT-aware *Resource Server* capacity, JWT validation is necessary and implementors may use the [ngx_http_auth_jwt_module](https://nginx.org/en/docs/http/ngx_http_auth_jwt_module.html).
 
+&nbsp;
 
 ## Interoperability
 
@@ -139,11 +162,16 @@ NGINX Plus team have created deployment guides for various 3rd party IdPs includ
 
 **[Single Sign-On with OpenID Connect and Identity Providers](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/)**
 
-
+&nbsp;
 
 ## Troubleshooting and Debugging
 
-NGINX generally produces self-evident log messages to indicate various problems with the OIDC process. Here are some common errors that engineers may encounter.
+NGINX generally produces self-evident log messages to indicate various problems with the OIDC process. If the log messages do not clearly indicate the problem, it is possible to use debugging techniquest listed in this article:
+
+[Debugging NGINX](https://docs.nginx.com/nginx/admin-guide/monitoring/debugging/)
+
+
+At normal log level, here are some common errors that engineers may encounter.
 
 
 ### Common Errors
@@ -166,7 +194,7 @@ Ensure that NGINX Plus can validate the certificate of the OIDC Authentication S
 
 * Use a publicly trusted certificate on the Authentication Server
 * Add a CA entry to NGINX Plus where the ```subject``` matches the ```issuer``` of the Authentication Server's certificate
-* To use a *self-signed* certificate on the Authentication Server, insert a reference to it inside the [```ssl_trusted_certificate```](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#ssl_trusted_certificate) configuration
+* To use a *self-signed* certificate on your Authentication Server, place it as a ```PEM``` on the server and link it inside the [```ssl_trusted_certificate```](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#ssl_trusted_certificate) configuration
 
 -----
 
@@ -193,6 +221,7 @@ NGINX Plus uses its own private resolver. Ensure that the Authentication Server'
 
 Ensure that the ```auth_time``` parameter in the ID Token provided by the Authentication Server's token endpoint matches the initial grant's ```iat``` authentication time.
 
+&nbsp;
 
 -------
 
@@ -224,26 +253,28 @@ This demo uses two hosts.
     * OIDC configuration: ```/home/ubuntu/oidc/nginx.conf```
     * SSL Certificates (tea.lab.f5npi.net): ```/home/ubuntu/oidc/tea.lab.f5npi.net```
 
+&nbsp;
 
-## Lab Walkthrough
+>**NOTE** Both systems include a script ```/home/ubuntu/refresh_certificates.sh``` to update the certificates after they expire.
 
-In this lab we'll discuss and demonstrate a simple OpenID Connect deployment and review the logs. A simple and well commented javascript-based OpenID Connect server is included. You may it helpful for testing custom scenarios that mimic OpenID Connect Authentication Providers.
+&nbsp;
 
+## Basic Authentication Lab
+
+In this lab we'll discuss and demonstrate an OpenID Connect deployment and review the logs. A simple javascript-based OpenID Connect server is included. You may it helpful for testing custom scenarios that mimic OpenID Connect Authentication Providers. 
+
+Feel free to edit the Authentication Server code to add extra behaviors. Because common javascript modules are used in the implementation, ChatGPT and the like should easily be able to make changes for you.
+
+&nbsp;
 
 **Overview**
 
-
-### Start the UDF lab
-
-Log in to [udf.f5.com](udf.f5.com), click **Blueprints**, then find "SDE NGINX Plus R34 Upskilling" and **Deploy** it.
-
-<img src="media/5-oidc/udf-start.png" width="45%"/>
-
-After it's deployed, click **Deployments** on the left nav, find the deployment, then click **Start** to boot the lab. Accept the default resources, set the desired duration, then click **Start**
-
-Your environment will start in about 10 minutes.
-
-&nbsp;
+1. [Start UDF lab](#start-udf-lab)
+1. [Start Auth Server](#start-openid-connect-provider)
+1. [Configure NGINX Server](#configure-nginx-server)
+1. [Start NGINX Server](#start-nginx-server)
+1. [Browse to Protected Web Service](#browse-to-protected-web-service)
+1. [Complete Logon Process](#complete-logon-process)
 
 
 ### Details of the OpenID Connect Provider Script
@@ -261,24 +292,41 @@ For this lab, we'll set up details from the *cafe.lab.f5npi.net* lab Authorizati
     * A certificate for **tea.lab.f5npi.net** is included: ```tea.lab.f5npi.net.key``` & ```tea.lab.f5npi.net.pem```.
 
 
+### Start UDF lab
 
-### Start the OpenID Connect Provider
+Log in to [udf.f5.com](udf.f5.com), click **Blueprints**, then find "SDE NGINX Plus R34 Upskilling" and **Deploy** it.
+
+<img src="media/5-oidc/udf-start.png" width="45%"/>
+
+After it's deployed, click **Deployments** on the left nav, find the deployment, then click **Start** to boot the lab. Accept the default resources, set the desired duration, then click **Start**
+
+Your environment will start in about 10 minutes.
+
+&nbsp;
+
+### Start OpenID Connect Provider
 
 The jump host has javascript-based server code that implements a simple OpenID Connect Authorization Server.
 
 1. Navigate to the Deployment, then click **Components**. 
 2. Click **Jumphost**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
-3. Switch to the *oidc-as* directory in ubuntu's homedir: ```cd /home/ubuntu/oidc-as```
-4. Refresh the lab certificates: ```./refresh_certificates.sh```
-5. Run the server: ```./run.sh```
-
-Leave this terminal running so we can watch the logs later.
+3. Change to the ubuntu user: ```su ubuntu - ```
+4. Switch to the *oidc-as* directory in ubuntu's homedir: ```cd /home/ubuntu/oidc-as```
+5. Refresh the lab certificates: ```./refresh_certificates.sh```
+6. Run the server: ```./run.sh```
+7. Leave this terminal running so we can watch the logs later.
 
 &nbsp;
 
-### Configure the NGINX Server
+### Configure NGINX Server
 
 To configure the server, we'll set the following in an ```nginx.conf``` configuration file.
+
+1. Navigate to the Deployment, then click **Components**. 
+2. Click **NGINX Plus R34 (Part 2)**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
+3. Change to the ubuntu user: ```su ubuntu - ```
+4. Switch to the *oidc-as* directory in ubuntu's homedir: ```cd /home/ubuntu/oidc```
+
 
 Review the [documentation](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/) and set the configuration with the values above.
 
@@ -349,29 +397,1933 @@ mgmt {
 ```
 </details>
 
+&nbsp;
+
+
 ### Start the NGINX Server
 
-Stop any nginx that are running: ```nginx -s stop```
-
-Start nginx using the configuration we've made: ```nginx -c /home/ubuntu/oidc/nginx.conf```
-
-Your server is now started.
+1. Stop any nginx that are running: ```sudo nginx -s stop```
+2. Start nginx using the configuration we've made: ```sudo nginx -c /home/ubuntu/oidc/nginx.conf```
+    Your server is now started.
+4. Begin watching the logs to review the log messages produced during the lab: ```tail /var/log/nginx/access.log /var/log/nginx/error.log --follow=name```
+5. Leave this terminal running so we can watch the logs later.
 
 &nbsp;
 
 
-#### Browse to the Protected Web Services
+
+### Browse to Protected Web Services
+
+Let's now browse to the web service and observe what happens.
 
 1. Navigate to the Deployment, then click **Components**. 
-2. Click **Jumphost**, then **Details** >> **Access** >> **Firefox** to open a browser running on the jump host. The browser will open in a new browser tab.
-3. Navigate to ```https://tea.lab.f5npi.net```
+2. Click **Jumphost**, then **Details** >> **Access** >> **Firefox Browser** to open a browser running on the jump host. The browser will open in a new browser tab.
+3. Within the Firefox "browser-in-a-browser-tab", Navigate to ```https://tea.lab.f5npi.net```
+
+<img src="media/5-oidc/ff-browse-to-tea.png" width="35%"/>
+
+In these first few steps, NGINX has performed a DNS lookup on the ```oidc-provider hostname```, visited the ```well-known``` endpoint, and redirected the end user's Firefox client to the Authorize endpoint with a [*nonce*](https://en.wikipedia.org/wiki/Cryptographic_nonce). Next, the Firefox browser follows the redirect.
+
+Observe the result from these events the Authentictaion Server terminal
+
+<details><summary>Example Authentication Server Log - NGINX Hits Metadata Endpoint</summary>
+
+```
+[2025-05-01T22:46:39.130Z] (/.well-known/openid-configuration) returning openid metadata: {
+  "issuer": "https://cafe.lab.f5npi.net",
+  "authorization_endpoint": "https://cafe.lab.f5npi.net/authorize",
+  "token_endpoint": "https://cafe.lab.f5npi.net/token",
+  "jwks_uri": "https://cafe.lab.f5npi.net/.well-known/jwks",
+  "response_types_supported": [
+    "code"
+  ],
+  "grant_types_supported": [
+    "authorization_code"
+  ],
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "email"
+  ]
+}
+```
+
+</details>
+
+<details><summary>Firefox Client hits Authorization Endpoint</summary>
+
+```
+[2025-05-01T22:46:39.160Z] (/authorize) Got request: {
+  "response_type": "code",
+  "scope": "openid",
+  "client_id": "1234",
+  "redirect_uri": "https://tea.lab.f5npi.net/oidc_callback",
+  "state": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY",
+  "nonce": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY"
+}
+[2025-05-01T22:46:39.162Z] (/authorize) Authorization code generated: f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef, sending forms logon page
+```
+
+</details>
 
 &nbsp;
 
 
-#### Observe NGINX-to-Authentication Server Communication
+### Complete Logon Process
+
+This implements a minimal Authentication Server logon process.
+
+
+1. Use Firefox to submit any username and password to the forms logon page. 
+2. Switch back to the Authentication Server terminal and observe the activity. Review the events:
+
+     * The client browser POSTs the username and password to the Authentication Server's authorize-logon endpoint
+     * The Authentication Server responds to the POST with a redirect to the Authentication Server. This redirect contains the *tokencode*
+     * NGINX uses this *tokencode* and its pre-configured *client secret* against the Authentication Server's token endpoint
+     * The Authentication Server responds to NGINX with the OAuth *Bearer Token* and OIDC *ID Token*
+
+&nbsp;
+
+
+<details><summary>Firefox Client POSTs username and password to authorize-logon endpoint and obtains tokencode</summary>
+
+```
+[2025-05-01T23:03:36.391Z] (/authorize-logon) client hits authorize-logon endpoint
+[2025-05-01T23:03:36.392Z] (/authorize-logon) User testuser success, redirect client: https://tea.lab.f5npi.net/oidc_callback?code=f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef&state=DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY
+[2025-05-01T23:03:36.459Z] (/token) New Token Request, username: 1234, password: myprivateclientsecret. 
+ Req headers: {
+  "host": "cafe.lab.f5npi.net",
+  "connection": "close",
+  "content-length": "160",
+  "content-type": "application/x-www-form-urlencoded",
+  "authorization": "Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ="
+} 
+ Req body: {
+  "grant_type": "authorization_code",
+  "code": "f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef",
+  "redirect_uri": "https://tea.lab.f5npi.net/oidc_callback"
+} 
+```
+
+</details>
+
+
+<details><summary>NGINX uses tokencode to obtain a code grant from Authorization Server's token endpoint</summary>
+
+```
+[2025-05-01T23:03:36.459Z] (/token) New Token Request, username: 1234, password: myprivateclientsecret. 
+ Req headers: {
+  "host": "cafe.lab.f5npi.net",
+  "connection": "close",
+  "content-length": "160",
+  "content-type": "application/x-www-form-urlencoded",
+  "authorization": "Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ="
+} 
+ Req body: {
+  "grant_type": "authorization_code",
+  "code": "f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef",
+  "redirect_uri": "https://tea.lab.f5npi.net/oidc_callback"
+} 
+[2025-05-01T23:03:36.460Z] (/token) testing provided auth code: f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef...
+[2025-05-01T23:03:36.460Z] (/token) It matches auth code entry: {
+  "f83e4a2ef7fba5b9af03bda2db662d6f0335b3315799c493c9dcf70e1f8419ef": {
+    "client_id": "1234",
+    "redirect_uri": "https://tea.lab.f5npi.net/oidc_callback",
+    "state": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY",
+    "scope": "openid",
+    "nonce": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY"
+  },
+  "d591a0f0f4560c78b6aff3c5ba05a559b5163b07e8b859ac1edc31b869bfddf7": {
+    "client_id": "1234",
+    "redirect_uri": "https://tea.lab.f5npi.net/oidc_callback",
+    "state": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY",
+    "scope": "openid",
+    "nonce": "DpU_XLBoUNpuFFAIQh-1YK14iIc_FWlRP9zROwRbnFY"
+  }
+} 
+[2025-05-01T23:03:36.500Z] (generateAccessTokenPayload) Generated: {
+  "iss": "https://cafe.lab.f5npi.net",
+  "sub": "example-user-id",
+  "aud": "1234",
+  "exp": 1746140676, // 11:04:36 PM , 5/1/2025 UTC
+  "iat": 1746140616, // 11:03:36 PM , 5/1/2025 UTC
+}
+[2025-05-01T23:03:36.505Z] (generateIdTokenPayload) Generated: {
+  "iss": "https://cafe.lab.f5npi.net",
+  "sub": "example-user-id",
+  "aud": "1234",
+  "exp": 1746140676, // 11:04:36 PM , 5/1/2025 UTC
+  "iat": 1746140616, // 11:03:36 PM , 5/1/2025 UTC
+  "auth_time": 1746140616, // 11:03:36 PM , 5/1/2025 UTC
+  "email": "emailaddress@example.com",
+  "name": "Example Name",
+}
+[2025-05-01T23:03:36.507Z] (/token) Returning {
+  "id_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2NhZmUubGFiLmY1bnBpLm5ldCIsInN1YiI6ImV4YW1wbGUtdXNlci1pZCIsImF1ZCI6IjEyMzQiLCJleHAiOjE3NDYxNDA2NzYsImlhdCI6MTc0NjE0MDYxNiwiYXV0aF90aW1lIjoxNzQ2MTQwNjE2LCJlbWFpbCI6ImVtYWlsYWRkcmVzc0BleGFtcGxlLmNvbSIsIm5hbWUiOiJFeGFtcGxlIE5hbWUiLCJub25jZSI6IkRwVV9YTEJvVU5wdUZGQUlRaC0xWUsxNGlJY19GV2xSUDl6Uk93UmJuRlkifQ.lTnNW9KeOF6J1h6p6wZcLmvCViYqZKJBf9iBeC1-bCs",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2NhZmUubGFiLmY1bnBpLm5ldCIsInN1YiI6ImV4YW1wbGUtdXNlci1pZCIsImF1ZCI6IjEyMzQiLCJleHAiOjE3NDYxNDA2NzYsImlhdCI6MTc0NjE0MDYxNn0.BDe0cso5N5_TsDdny62oeBkh6SAsitKguqQxmgyEYIU",
+  "token_type": "Bearer",
+  "refresh_token": "7a4b1bc7019fe135bb06b52470390f3a9fa73cefbb1981921893eedf8369fbe9",
+  "expires_in": 60,
+} to client
+
+```
+</details>
+
+&nbsp;
+
+-------
+
+### Summary
+
+That's it! The OIDC logon process implemented by NGINX follows these straightforward steps.
+
+&nbsp;
+
+## Debug Log Example
+
+You may find these example verbose debug logs from an authentication session and token refresh helpful.
+
+
+<details><summary>Click to expand example debug logs</summary>
+
+``` bash
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:6 ev:0001 d:000072E767374010
+2025/05/05 21:43:37 [debug] 1070#1070: accept on 0.0.0.0:443, ready: 0
+2025/05/05 21:43:37 [debug] 1070#1070: posix_memalign: 000060E5A55DAEB0:512 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 accept: 10.1.1.7:57564 fd:3
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer add: 3: 60000:3800544
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 epoll add event: fd:3 op:1 ev:80002001
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 85628
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:3 ev:0001 d:000072E7673742F9
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http check ssl handshake
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http recv(): 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 https ssl handshake: 0x16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 tcp_nodelay
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL server name: "tea.lab.f5npi.net"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL ALPN supported by client: h2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL ALPN supported by client: http/1.1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL ALPN selected: http/1.1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_do_handshake: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 59999
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:3 ev:0001 d:000072E7673742F9
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL handshake handler: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_do_handshake: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL: TLSv1.3, cipher: "TLS_AES_128_GCM_SHA256 TLSv1.3 Kx=any Au=any Enc=AESGCM(128) Mac=AEAD"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http wait request handler
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A5593BD0:1024
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_read: 441
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55DB550:4096 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http process request line
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http request line: "GET / HTTP/1.1"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http uri: "/"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http args: ""
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http exten: ""
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A53D6F30:4096 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http process request header line
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Host: tea.lab.f5npi.net"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Connection: keep-alive"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Sec-Fetch-Site: none"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header: "Priority: u=0, i"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http header done
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer del: 3: 3800544
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 rewrite phase: 2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 test location: "/"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 using configuration "/"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http cl:-1 max:1048576
+2025/05/05 21:43:37 [debug] 1070#1070: *2 rewrite phase: 4
+2025/05/05 21:43:37 [debug] 1070#1070: *2 post rewrite phase: 5
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 6
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 7
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 access phase: 9
+2025/05/05 21:43:37 [debug] 1070#1070: *2 access phase: 10
+2025/05/05 21:43:37 [debug] 1070#1070: *2 OIDC (auth_lab)
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55C8180:4096 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http subrequest "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http posted request: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 rewrite phase: 2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 test location: "/auth_lab"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 using configuration "=/auth_lab"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http cl:-1 max:1048576
+2025/05/05 21:43:37 [debug] 1070#1070: *2 rewrite phase: 4
+2025/05/05 21:43:37 [debug] 1070#1070: *2 post rewrite phase: 5
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 6
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 7
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 15
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 generic phase: 17
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script var: "https://cafe.lab.f5npi.net/.well-known/openid-configuration"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http init upstream, client timer: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 epoll add event: fd:3 op:3 ev:80002005
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script copy: "Host"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script var: "cafe.lab.f5npi.net"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script copy: "Connection"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script copy: "close"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script copy: ""
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http script copy: ""
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header:
+"GET /.well-known/openid-configuration HTTP/1.0
+Host: cafe.lab.f5npi.net
+Connection: close
+
+"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http cleanup add: 000060E5A55DC538
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A5595F20:224
+2025/05/05 21:43:37 [debug] 1070#1070: resolve: "cafe.lab.f5npi.net"
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A53D1340:184
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A5577180:18
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A55774E0:72
+2025/05/05 21:43:37 [debug] 1070#1070: resolve: "cafe.lab.f5npi.net" A 65021
+2025/05/05 21:43:37 [debug] 1070#1070: resolve: "cafe.lab.f5npi.net" AAAA 40175
+2025/05/05 21:43:37 [debug] 1070#1070: UDP socket 12
+2025/05/05 21:43:37 [debug] 1070#1070: connect to 127.0.0.53:53, fd:12 #3
+2025/05/05 21:43:37 [debug] 1070#1070: epoll add event: fd:12 op:1 ev:80002001
+2025/05/05 21:43:37 [debug] 1070#1070: send: fd:12 36 of 36
+2025/05/05 21:43:37 [debug] 1070#1070: send: fd:12 36 of 36
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A5589740:96
+2025/05/05 21:43:37 [debug] 1070#1070: event timer add: -1: 30000:3770551
+2025/05/05 21:43:37 [debug] 1070#1070: event timer add: -1: 5000:3745551
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http finalize request: -4, "/auth_lab?" a:1, c:3
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http request count:3 blk:0
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 6
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 5000
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:3 ev:0004 d:000072E7673742F9
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http run request: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream check client, write event:1, "/auth_lab"
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 4999
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:12 ev:0001 d:000072E7673743F0
+2025/05/05 21:43:37 [debug] 1070#1070: recv: fd:12 52 of 4096
+2025/05/05 21:43:37 [debug] 1070#1070: resolver DNS response 65021 fl:8580 1/1/0/0
+2025/05/05 21:43:37 [debug] 1070#1070: resolver DNS response qt:1 cl:1
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A55DA8A0:19
+2025/05/05 21:43:37 [debug] 1070#1070: resolver qs:cafe.lab.f5npi.net
+2025/05/05 21:43:37 [debug] 1070#1070: resolver naddrs:1 cname:0000000000000000 ttl:0
+2025/05/05 21:43:37 [debug] 1070#1070: recv: fd:12 36 of 4096
+2025/05/05 21:43:37 [debug] 1070#1070: resolver DNS response 40175 fl:8580 1/0/0/0
+2025/05/05 21:43:37 [debug] 1070#1070: resolver DNS response qt:28 cl:1
+2025/05/05 21:43:37 [debug] 1070#1070: malloc: 000060E5A55DA8A0:19
+2025/05/05 21:43:37 [debug] 1070#1070: resolver qs:cafe.lab.f5npi.net
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream resolve: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 name was resolved to 10.1.1.7
+2025/05/05 21:43:37 [debug] 1070#1070: resolve name done: 0
+2025/05/05 21:43:37 [debug] 1070#1070: event timer del: -1: 3770551
+2025/05/05 21:43:37 [debug] 1070#1070: resolver expire
+2025/05/05 21:43:37 [debug] 1070#1070: event timer del: -1: 3745551
+2025/05/05 21:43:37 [debug] 1070#1070: *2 get rr peer, try: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 stream socket 13
+2025/05/05 21:43:37 [debug] 1070#1070: *2 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:43:37 [debug] 1070#1070: *2 connect to 10.1.1.7:443, fd:13 #4
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream connect: -2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55891E0:128 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer add: 13: 60000:3800553
+2025/05/05 21:43:37 [debug] 1070#1070: recv: fd:12 -1 of 4096
+2025/05/05 21:43:37 [debug] 1070#1070: recv() not ready (11: Resource temporarily unavailable)
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream send request handler
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A5589740:96
+2025/05/05 21:43:37 [debug] 1070#1070: *2 upstream SSL server name: "cafe.lab.f5npi.net"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 tcp_nodelay
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_do_handshake: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL handshake handler: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 verify:1, error:0, depth:2, subject:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 verify:1, error:0, depth:1, subject:"/C=US/O=Let's Encrypt/CN=E6", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 verify:1, error:0, depth:0, subject:"/CN=cafe.lab.f5npi.net", issuer:"/C=US/O=Let's Encrypt/CN=E6"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_do_handshake: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL: TLSv1.3, cipher: "TLS_AES_256_GCM_SHA384 TLSv1.3 Kx=any Au=any Enc=AESGCM(256) Mac=AEAD"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream ssl handshake: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 X509_check_host(): match
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream send request
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream send request body
+2025/05/05 21:43:37 [debug] 1070#1070: *2 chain writer buf fl:1 s:95
+2025/05/05 21:43:37 [debug] 1070#1070: *2 chain writer in: 000060E5A55C8F18
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A55E01E0:80
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A55CAF50:16384
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL buf copy: 95
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL to write: 95
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_write: 95
+2025/05/05 21:43:37 [debug] 1070#1070: *2 chain writer out: 0000000000000000
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer del: 13: 3800553
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer add: 13: 60000:3800561
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A55CEF60:4096
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream dummy handler
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 8
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:37 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_read: 552
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy status 200 "200 OK"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55E26E0:4096 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "X-Powered-By: Express"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "Content-Type: application/json; charset=utf-8"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "Content-Length: 343"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "ETag: W/"157-HRZdl//i61F35FOfDQNmiy+HGoQ""
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "Date: Mon, 05 May 2025 21:43:37 GMT"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header: "Connection: close"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy header done
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http cacheable: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http proxy filter init s:200 h:0 c:0 l:343
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream process upstream
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe read upstream: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe preread: 343
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe buf free s:0 t:1 f:0 000060E5A55CEF60, pos 000060E5A55CF031, size: 343 file: 0, size: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe length: 343
+2025/05/05 21:43:37 [debug] 1070#1070: *2 input buf #0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe write downstream: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe write downstream flush in
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http output filter "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter "/auth_lab?" 000060E5A55C9170
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter in memory
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter in memory 343 bytes
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 pipe write downstream done
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer: 13, old: 3800561, new: 3800795
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream exit: 0000000000000000
+2025/05/05 21:43:37 [debug] 1070#1070: *2 finalize http upstream request: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 finalize http proxy request
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free rr peer 1 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_shutdown: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 close http upstream connection: 13
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55CAF50
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55E01E0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A5589740
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55891E0, unused: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer del: 13: 3800561
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http upstream temp fd: -1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http output filter "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter "/auth_lab?" 00007FFDE1ACC490
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter in memory
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http finalize request: 0, "/auth_lab?" a:1, c:2
+2025/05/05 21:43:37 [debug] 1070#1070: *2 OIDC (auth_lab): metadata request done: status 200
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55C9190:8192 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http wake parent request: "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http posted request: "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 access phase: 10
+2025/05/05 21:43:37 [debug] 1070#1070: *2 OIDC (auth_lab)
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 136 slot: 5
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 000072E76680D100
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 6 slot: 0
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 000072E76680F040
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 32 slot: 2
+2025/05/05 21:43:37 [debug] 1070#1070: slab alloc: 000072E766810020
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http finalize request: 302, "/?" a:1, c:1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http special response: 302, "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http set discard body
+2025/05/05 21:43:37 [debug] 1070#1070: *2 HTTP/1.1 302 Moved Temporarily
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:43:37 GMT
+Content-Type: text/html
+Content-Length: 145
+Connection: keep-alive
+Set-Cookie: NGX_OIDC_SESSION=f93b248cd479d24eff816693785c52683c7d9c/; httponly; secure; path=/
+Location: https://cafe.lab.f5npi.net/authorize?response_type=code&scope=openid&client_id=1234&redirect_uri=https%3A%2F%2Ftea.lab.f5npi.net%2Foidc_callback&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos
+
+2025/05/05 21:43:37 [debug] 1070#1070: *2 write new buf t:1 f:0 000060E5A55E2E80, pos 000060E5A55E2E80, size: 515 file: 0, size: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http write filter: l:0 f:0 s:515
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http output filter "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http postpone filter "/?" 000060E5A55E31C8
+2025/05/05 21:43:37 [debug] 1070#1070: *2 write old buf t:1 f:0 000060E5A55E2E80, pos 000060E5A55E2E80, size: 515 file: 0, size: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 write new buf t:0 f:0 0000000000000000, pos 000060E596471460, size: 92 file: 0, size: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 write new buf t:0 f:0 0000000000000000, pos 000060E596471800, size: 53 file: 0, size: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http write filter: l:1 f:0 s:660
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http write filter limit 2097152
+2025/05/05 21:43:37 [debug] 1070#1070: *2 posix_memalign: 000060E5A55DCC00:512 @16
+2025/05/05 21:43:37 [debug] 1070#1070: *2 malloc: 000060E5A55CFF70:16384
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL buf copy: 515
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL buf copy: 92
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL buf copy: 53
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL to write: 660
+2025/05/05 21:43:37 [debug] 1070#1070: *2 SSL_write: 660
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http write filter 0000000000000000
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http copy filter: 0 "/?"
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http finalize request: 0, "/?" a:1, c:1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 set http keepalive handler
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http close request
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http log handler
+2025/05/05 21:43:37 [debug] 1070#1070: *2 http session log handler
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55CEF60
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55DB550, unused: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A53D6F30, unused: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55C8180, unused: 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55E26E0, unused: 1058
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A5593BD0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 hc free: 0000000000000000
+2025/05/05 21:43:37 [debug] 1070#1070: *2 hc busy: 0000000000000000 0
+2025/05/05 21:43:37 [debug] 1070#1070: *2 free: 000060E5A55CFF70
+2025/05/05 21:43:37 [debug] 1070#1070: *2 reusable connection: 1
+2025/05/05 21:43:37 [debug] 1070#1070: *2 event timer add: 3: 75000:3815795
+2025/05/05 21:43:37 [debug] 1070#1070: timer delta: 234
+2025/05/05 21:43:37 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:37 [debug] 1070#1070: epoll timer: 75000
+
+==> /var/log/nginx/access.log <==
+10.1.1.7 - - [05/May/2025:21:43:37 +0000] "GET / HTTP/1.1" 302 145 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:43:51 [debug] 1070#1070: epoll: fd:3 ev:0005 d:000072E7673742F9
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http keepalive handler
+2025/05/05 21:43:51 [debug] 1070#1070: *2 malloc: 000060E5A5593BD0:1024
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_read: 733
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:51 [debug] 1070#1070: *2 posix_memalign: 000060E5A55C8180:4096 @16
+2025/05/05 21:43:51 [debug] 1070#1070: *2 event timer del: 3: 3815795
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http process request line
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http request line: "GET /oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos HTTP/1.1"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http uri: "/oidc_callback"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http args: "code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http exten: ""
+2025/05/05 21:43:51 [debug] 1070#1070: *2 posix_memalign: 000060E5A53D6F30:4096 @16
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http process request header line
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Host: tea.lab.f5npi.net"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Connection: keep-alive"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Cookie: NGX_OIDC_SESSION=f93b248cd479d24eff816693785c52683c7d9c/"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header: "Priority: u=0, i"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http header done
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 0
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 rewrite phase: 2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 test location: "/"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 using configuration "/"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http cl:-1 max:1048576
+2025/05/05 21:43:51 [debug] 1070#1070: *2 rewrite phase: 4
+2025/05/05 21:43:51 [debug] 1070#1070: *2 post rewrite phase: 5
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 6
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 7
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 8
+2025/05/05 21:43:51 [debug] 1070#1070: *2 access phase: 9
+2025/05/05 21:43:51 [debug] 1070#1070: *2 access phase: 10
+2025/05/05 21:43:51 [debug] 1070#1070: *2 OIDC (auth_lab)
+2025/05/05 21:43:51 [debug] 1070#1070: *2 parse header: "Cookie: NGX_OIDC_SESSION=f93b248cd479d24eff816693785c52683c7d9c/"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 posix_memalign: 000060E5A55DB550:4096 @16
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http subrequest "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http posted request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 rewrite phase: 2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 test location: "/auth_lab"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 using configuration "=/auth_lab"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http cl:160 max:1048576
+2025/05/05 21:43:51 [debug] 1070#1070: *2 rewrite phase: 4
+2025/05/05 21:43:51 [debug] 1070#1070: *2 post rewrite phase: 5
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 6
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 7
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 8
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 15
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 16
+2025/05/05 21:43:51 [debug] 1070#1070: *2 generic phase: 17
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script var: "https://cafe.lab.f5npi.net/token"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http init upstream, client timer: 0
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script copy: "Host"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script var: "cafe.lab.f5npi.net"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script copy: "Connection"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script copy: "close"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script copy: "Content-Length"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script var: "160"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http script copy: ""
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http proxy header: "Content-Type: application/x-www-form-urlencoded"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http proxy header: "Authorization: Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ="
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http proxy header:
+"POST /token HTTP/1.0
+Host: cafe.lab.f5npi.net
+Connection: close
+Content-Length: 160
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ=
+
+"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http cleanup add: 000060E5A55DC350
+2025/05/05 21:43:51 [debug] 1070#1070: malloc: 000060E5A55D81D0:224
+2025/05/05 21:43:51 [debug] 1070#1070: resolve: "cafe.lab.f5npi.net"
+2025/05/05 21:43:51 [debug] 1070#1070: resolve cached
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream resolve: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 name was resolved to 10.1.1.7
+2025/05/05 21:43:51 [debug] 1070#1070: *2 posix_memalign: 000060E5A55CB1A0:4096 @16
+2025/05/05 21:43:51 [debug] 1070#1070: resolve name done: 0
+2025/05/05 21:43:51 [debug] 1070#1070: resolver expire
+2025/05/05 21:43:51 [debug] 1070#1070: *2 get rr peer, try: 1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 stream socket 13
+2025/05/05 21:43:51 [debug] 1070#1070: *2 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:43:51 [debug] 1070#1070: *2 connect to 10.1.1.7:443, fd:13 #5
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream connect: -2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 posix_memalign: 000060E5A55D84F0:128 @16
+2025/05/05 21:43:51 [debug] 1070#1070: *2 event timer add: 13: 60000:3814325
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http finalize request: -4, "/auth_lab?" a:1, c:3
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http request count:3 blk:0
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http run request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream check client, write event:1, "/auth_lab"
+2025/05/05 21:43:51 [debug] 1070#1070: timer delta: 13530
+2025/05/05 21:43:51 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:51 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:51 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E9
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream send request handler
+2025/05/05 21:43:51 [debug] 1070#1070: *2 malloc: 000060E5A5589530:96
+2025/05/05 21:43:51 [debug] 1070#1070: *2 upstream SSL server name: "cafe.lab.f5npi.net"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 tcp_nodelay
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_do_handshake: -1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:51 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:43:51 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:51 [debug] 1070#1070: epoll timer: 59999
+2025/05/05 21:43:51 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL handshake handler: 0
+2025/05/05 21:43:51 [debug] 1070#1070: *2 verify:1, error:0, depth:2, subject:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 verify:1, error:0, depth:1, subject:"/C=US/O=Let's Encrypt/CN=E6", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 verify:1, error:0, depth:0, subject:"/CN=cafe.lab.f5npi.net", issuer:"/C=US/O=Let's Encrypt/CN=E6"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_do_handshake: 1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL: TLSv1.3, cipher: "TLS_AES_256_GCM_SHA384 TLSv1.3 Kx=any Au=any Enc=AESGCM(256) Mac=AEAD"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream ssl handshake: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 X509_check_host(): match
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream send request
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream send request body
+2025/05/05 21:43:51 [debug] 1070#1070: *2 chain writer buf fl:0 s:198
+2025/05/05 21:43:51 [debug] 1070#1070: *2 chain writer buf fl:1 s:160
+2025/05/05 21:43:51 [debug] 1070#1070: *2 chain writer in: 000060E5A55CB268
+2025/05/05 21:43:51 [debug] 1070#1070: *2 malloc: 000060E5A55D8580:80
+2025/05/05 21:43:51 [debug] 1070#1070: *2 malloc: 000060E5A55CDF70:16384
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL buf copy: 198
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL buf copy: 160
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL to write: 358
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_write: 358
+2025/05/05 21:43:51 [debug] 1070#1070: *2 chain writer out: 0000000000000000
+2025/05/05 21:43:51 [debug] 1070#1070: *2 event timer del: 13: 3814325
+2025/05/05 21:43:51 [debug] 1070#1070: *2 event timer add: 13: 60000:3814329
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:51 [debug] 1070#1070: *2 malloc: 000060E5A55D1F80:4096
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream dummy handler
+2025/05/05 21:43:51 [debug] 1070#1070: timer delta: 3
+2025/05/05 21:43:51 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:51 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:51 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:51 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:51 [debug] 1070#1070: *2 http upstream dummy handler
+2025/05/05 21:43:51 [debug] 1070#1070: timer delta: 7
+2025/05/05 21:43:51 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:51 [debug] 1070#1070: epoll timer: 59993
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream request: "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_read: 990
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_read: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_get_error: 6
+2025/05/05 21:43:52 [debug] 1070#1070: *2 peer shutdown SSL cleanly
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy status 200 "200 OK"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "X-Powered-By: Express"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Content-Type: application/json; charset=utf-8"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Content-Length: 781"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "ETag: W/"30d-3VGQBvHRDTcLeyo2LKkjQj6zaiM""
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Date: Mon, 05 May 2025 21:43:51 GMT"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Connection: close"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header done
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http cacheable: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy filter init s:200 h:0 c:0 l:781
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream process upstream
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe read upstream: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe preread: 781
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe recv chain: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe buf free s:0 t:1 f:0 000060E5A55D1F80, pos 000060E5A55D2051, size: 781 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe length: 781
+2025/05/05 21:43:52 [debug] 1070#1070: *2 input buf #0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream flush in
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http output filter "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter "/auth_lab?" 000060E5A55CB248
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter in memory
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter in memory 781 bytes
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream done
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer del: 13: 3814329
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer add: 13: 60000:3815813
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream exit: 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 finalize http upstream request: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 finalize http proxy request
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free rr peer 1 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_shutdown: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 close http upstream connection: 13
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55CDF70
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55D8580
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A5589530
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55D84F0, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer del: 13: 3815813
+2025/05/05 21:43:52 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream temp fd: -1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http output filter "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter "/auth_lab?" 00007FFDE1ACC490
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter in memory
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http finalize request: 0, "/auth_lab?" a:1, c:2
+2025/05/05 21:43:52 [debug] 1070#1070: *2 OIDC (auth_lab): token request done: status 200
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http wake parent request: "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http posted request: "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 10
+2025/05/05 21:43:52 [debug] 1070#1070: *2 OIDC (auth_lab)
+2025/05/05 21:43:52 [debug] 1070#1070: *2 parse header: "Cookie: NGX_OIDC_SESSION=f93b248cd479d24eff816693785c52683c7d9c/"
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 136 slot: 5
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 000072E76680D200
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 32 slot: 2
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 000072E766810040
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 706 slot: 7
+2025/05/05 21:43:52 [debug] 1070#1070: slab alloc: 000072E766811000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http finalize request: 302, "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos" a:1, c:1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http special response: 302, "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http set discard body
+2025/05/05 21:43:52 [debug] 1070#1070: *2 posix_memalign: 000060E5A55D2F90:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 HTTP/1.1 302 Moved Temporarily
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:43:52 GMT
+Content-Type: text/html
+Content-Length: 145
+Location: https://tea.lab.f5npi.net/
+Connection: keep-alive
+Set-Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd; httponly; secure; path=/
+
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:1 f:0 000060E5A55D2FB0, pos 000060E5A55D2FB0, size: 290 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter: l:0 f:0 s:290
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http output filter "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos" 000060E5A55CB268
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write old buf t:1 f:0 000060E5A55D2FB0, pos 000060E5A55D2FB0, size: 290 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:0 f:0 0000000000000000, pos 000060E596471460, size: 92 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:0 f:0 0000000000000000, pos 000060E596471800, size: 53 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter: l:1 f:0 s:435
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter limit 2097152
+2025/05/05 21:43:52 [debug] 1070#1070: *2 malloc: 000060E5A55CC1B0:16384
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL buf copy: 290
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL buf copy: 92
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL buf copy: 53
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL to write: 435
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_write: 435
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: 0 "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http finalize request: 0, "/oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos" a:1, c:1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 set http keepalive handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http close request
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http log handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http session log handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55D1F80
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55C8180, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A53D6F30, unused: 8
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55DB550, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55CB1A0, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55D2F90, unused: 3217
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A5593BD0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 hc free: 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 hc busy: 0000000000000000 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55CC1B0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 reusable connection: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer add: 3: 75000:3830813
+2025/05/05 21:43:52 [debug] 1070#1070: timer delta: 1477
+2025/05/05 21:43:52 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:52 [debug] 1070#1070: epoll timer: 75000
+
+==> /var/log/nginx/access.log <==
+10.1.1.7 - - [05/May/2025:21:43:52 +0000] "GET /oidc_callback?code=794971cf7f81c51ae5ff06b79f2a7c45b786e41d71cc1e35ef616d640211a6b8&state=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos&nonce=Hol8fNMW7QgQzVA0tRbAia5dxBZBJLJn1amY5032Wos HTTP/1.1" 302 145 "https://cafe.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:3 ev:0005 d:000072E7673742F9
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http keepalive handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 malloc: 000060E5A5593BD0:1024
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_read: 543
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_read: -1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_get_error: 2
+2025/05/05 21:43:52 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 posix_memalign: 000060E5A55DB550:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer del: 3: 3830813
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http process request line
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http request line: "GET / HTTP/1.1"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http uri: "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http args: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http exten: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *2 posix_memalign: 000060E5A55C8180:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http process request header line
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Host: tea.lab.f5npi.net"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Connection: keep-alive"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header: "Priority: u=0, i"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http header done
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 rewrite phase: 2
+2025/05/05 21:43:52 [debug] 1070#1070: *2 test location: "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 using configuration "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http cl:-1 max:1048576
+2025/05/05 21:43:52 [debug] 1070#1070: *2 rewrite phase: 4
+2025/05/05 21:43:52 [debug] 1070#1070: *2 post rewrite phase: 5
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 6
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 7
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 8
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 9
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 10
+2025/05/05 21:43:52 [debug] 1070#1070: *2 OIDC (auth_lab)
+2025/05/05 21:43:52 [debug] 1070#1070: *2 parse header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 11
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 12
+2025/05/05 21:43:52 [debug] 1070#1070: *2 access phase: 13
+2025/05/05 21:43:52 [debug] 1070#1070: *2 post access phase: 14
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 15
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 generic phase: 17
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http init upstream, client timer: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script copy: "Host"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script var: "127.0.0.1:8080"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script copy: "Connection"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script copy: "close"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script copy: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http script copy: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Sec-Fetch-Dest: document"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Sec-Fetch-User: ?1"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Priority: u=0, i"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header:
+"GET / HTTP/1.0
+Host: 127.0.0.1:8080
+Connection: close
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br, zstd
+Referer: https://cafe.lab.f5npi.net/
+Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-site
+Sec-Fetch-User: ?1
+Priority: u=0, i
+
+"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 posix_memalign: 000060E5A53D6F30:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http cleanup add: 000060E5A55C9168
+2025/05/05 21:43:52 [debug] 1070#1070: *2 get rr peer, try: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 stream socket 13
+2025/05/05 21:43:52 [debug] 1070#1070: *2 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:43:52 [debug] 1070#1070: *2 connect to 127.0.0.1:8080, fd:13 #6
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream connect: -2
+2025/05/05 21:43:52 [debug] 1070#1070: *2 posix_memalign: 000060E5A55D8F10:128 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer add: 13: 60000:3815819
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http finalize request: -4, "/?" a:1, c:2
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http request count:2 blk:0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http run request: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream check client, write event:1, "/"
+2025/05/05 21:43:52 [debug] 1070#1070: timer delta: 6
+2025/05/05 21:43:52 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:52 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E8
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream request: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream send request handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream send request
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream send request body
+2025/05/05 21:43:52 [debug] 1070#1070: *2 chain writer buf fl:1 s:535
+2025/05/05 21:43:52 [debug] 1070#1070: *2 chain writer in: 000060E5A53D6FC0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 writev: 535 of 535
+2025/05/05 21:43:52 [debug] 1070#1070: *2 chain writer out: 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer del: 13: 3815819
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer add: 13: 60000:3815820
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:7 ev:0001 d:000072E767374108
+2025/05/05 21:43:52 [debug] 1070#1070: accept on 0.0.0.0:8080, ready: 0
+2025/05/05 21:43:52 [debug] 1070#1070: posix_memalign: 000060E5A55DCE10:512 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *7 accept: 127.0.0.1:57564 fd:14
+2025/05/05 21:43:52 [debug] 1070#1070: *7 event timer add: 14: 60000:3815820
+2025/05/05 21:43:52 [debug] 1070#1070: *7 reusable connection: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *7 epoll add event: fd:14 op:1 ev:80002001
+2025/05/05 21:43:52 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:43:52 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:52 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:14 ev:0001 d:000072E7673745E0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http wait request handler
+2025/05/05 21:43:52 [debug] 1070#1070: *7 malloc: 000060E5A55D68B0:1024
+2025/05/05 21:43:52 [debug] 1070#1070: *7 recv: eof:0, avail:-1
+2025/05/05 21:43:52 [debug] 1070#1070: *7 recv: fd:14 535 of 1024
+2025/05/05 21:43:52 [debug] 1070#1070: *7 reusable connection: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 posix_memalign: 000060E5A55CB1A0:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http process request line
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http request line: "GET / HTTP/1.0"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http uri: "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http args: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http exten: ""
+2025/05/05 21:43:52 [debug] 1070#1070: *7 posix_memalign: 000060E5A55CC1B0:4096 @16
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http process request header line
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Host: 127.0.0.1:8080"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Connection: close"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header: "Priority: u=0, i"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http header done
+2025/05/05 21:43:52 [debug] 1070#1070: *7 event timer del: 14: 3815820
+2025/05/05 21:43:52 [debug] 1070#1070: *7 generic phase: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 generic phase: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *7 rewrite phase: 2
+2025/05/05 21:43:52 [debug] 1070#1070: *7 test location: "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 using configuration "/"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http cl:-1 max:1048576
+2025/05/05 21:43:52 [debug] 1070#1070: *7 rewrite phase: 4
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http set discard body
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http script copy: "Hello, "
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http script copy: "!
+Email: "
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http script copy: "
+IdP sub: "
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http script copy: "
+auth: "
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http script copy: "
+"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:43:52 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: close
+
+2025/05/05 21:43:52 [debug] 1070#1070: *7 write new buf t:1 f:0 000060E5A55CC720, pos 000060E5A55CC720, size: 143 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http write filter: l:0 f:0 s:143
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http output filter "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http copy filter: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http postpone filter "/?" 00007FFDE1ACC3E0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 write old buf t:1 f:0 000060E5A55CC720, pos 000060E5A55CC720, size: 143 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 write new buf t:0 f:0 0000000000000000, pos 000060E5A55CC110, size: 34 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http write filter: l:1 f:0 s:177
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http write filter limit 2097152
+2025/05/05 21:43:52 [debug] 1070#1070: *7 writev: 177 of 177
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http write filter 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http copy filter: 0 "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http finalize request: 0, "/?" a:1, c:1
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http request count:1 blk:0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http close request
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http log handler
+
+==> /var/log/nginx/access.log <==
+127.0.0.1 - - [05/May/2025:21:43:52 +0000] "GET / HTTP/1.0" 200 34 "https://cafe.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:43:52 [debug] 1070#1070: *7 http session log handler
+2025/05/05 21:43:52 [debug] 1070#1070: *7 free: 000060E5A55CB1A0, unused: 8
+2025/05/05 21:43:52 [debug] 1070#1070: *7 free: 000060E5A55CC1B0, unused: 2183
+2025/05/05 21:43:52 [debug] 1070#1070: *7 close http connection: 14
+2025/05/05 21:43:52 [debug] 1070#1070: *7 reusable connection: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 free: 000060E5A55D68B0
+2025/05/05 21:43:52 [debug] 1070#1070: *7 free: 000060E5A55DCE10, unused: 128
+2025/05/05 21:43:52 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:43:52 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:52 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:43:52 [debug] 1070#1070: epoll: fd:13 ev:2005 d:000072E7673744E8
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream request: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream process header
+2025/05/05 21:43:52 [debug] 1070#1070: *2 malloc: 000060E5A55CB1A0:4096
+2025/05/05 21:43:52 [debug] 1070#1070: *2 recv: eof:1, avail:-1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 recv: fd:13 177 of 4096
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy status 200 "200 OK"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Server: nginx/1.27.4"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Date: Mon, 05 May 2025 21:43:52 GMT"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Content-Type: text/plain"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Content-Length: 34"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header: "Connection: close"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy header done
+2025/05/05 21:43:52 [debug] 1070#1070: *2 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:43:52 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: keep-alive
+
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:1 f:0 000060E5A53D7308, pos 000060E5A53D7308, size: 148 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter: l:0 f:0 s:148
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http cacheable: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http proxy filter init s:200 h:0 c:0 l:34
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream process upstream
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe read upstream: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe preread: 34
+2025/05/05 21:43:52 [debug] 1070#1070: *2 readv: eof:1, avail:0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 readv: 1, last:3919
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe recv chain: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe buf free s:0 t:1 f:0 000060E5A55CB1A0, pos 000060E5A55CB22F, size: 34 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe length: 34
+2025/05/05 21:43:52 [debug] 1070#1070: *2 input buf #0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream flush in
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http output filter "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter "/?" 000060E5A53D74D8
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write old buf t:1 f:0 000060E5A53D7308, pos 000060E5A53D7308, size: 148 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:1 f:0 000060E5A55CB1A0, pos 000060E5A55CB22F, size: 34 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter: l:0 f:0 s:182
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: 0 "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 pipe write downstream done
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer: 13, old: 3815820, new: 3815820
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream exit: 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 finalize http upstream request: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 finalize http proxy request
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free rr peer 1 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 close http upstream connection: 13
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55D8F10, unused: 48
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer del: 13: 3815820
+2025/05/05 21:43:52 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http upstream temp fd: -1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http output filter "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http postpone filter "/?" 00007FFDE1ACC490
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write old buf t:1 f:0 000060E5A53D7308, pos 000060E5A53D7308, size: 148 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write old buf t:1 f:0 000060E5A55CB1A0, pos 000060E5A55CB22F, size: 34 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 write new buf t:0 f:0 0000000000000000, pos 0000000000000000, size: 0 file: 0, size: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter: l:1 f:0 s:182
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter limit 2097152
+2025/05/05 21:43:52 [debug] 1070#1070: *2 malloc: 000060E5A55CC1B0:16384
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL buf copy: 148
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL buf copy: 34
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL to write: 182
+2025/05/05 21:43:52 [debug] 1070#1070: *2 SSL_write: 182
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http write filter 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http copy filter: 0 "/?"
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http finalize request: 0, "/?" a:1, c:1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 set http keepalive handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http close request
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http log handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 http session log handler
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55CB1A0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55DB550, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55C8180, unused: 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A53D6F30, unused: 2120
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A5593BD0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 hc free: 0000000000000000
+2025/05/05 21:43:52 [debug] 1070#1070: *2 hc busy: 0000000000000000 0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 free: 000060E5A55CC1B0
+2025/05/05 21:43:52 [debug] 1070#1070: *2 reusable connection: 1
+2025/05/05 21:43:52 [debug] 1070#1070: *2 event timer add: 3: 75000:3830820
+2025/05/05 21:43:52 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:43:52 [debug] 1070#1070: worker cycle
+2025/05/05 21:43:52 [debug] 1070#1070: epoll timer: 75000
+
+==> /var/log/nginx/access.log <==
+10.1.1.7 - - [05/May/2025:21:43:52 +0000] "GET / HTTP/1.1" 200 34 "https://cafe.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:45:07 [debug] 1070#1070: timer delta: 75067
+2025/05/05 21:45:07 [debug] 1070#1070: *2 event timer del: 3: 3830820
+2025/05/05 21:45:07 [debug] 1070#1070: *2 http keepalive handler
+2025/05/05 21:45:07 [debug] 1070#1070: *2 close http connection: 3
+2025/05/05 21:45:07 [debug] 1070#1070: *2 SSL_shutdown: 1
+2025/05/05 21:45:07 [debug] 1070#1070: *2 reusable connection: 0
+2025/05/05 21:45:07 [debug] 1070#1070: *2 free: 0000000000000000
+2025/05/05 21:45:07 [debug] 1070#1070: *2 free: 0000000000000000
+2025/05/05 21:45:07 [debug] 1070#1070: *2 free: 000060E5A55DAEB0, unused: 8
+2025/05/05 21:45:07 [debug] 1070#1070: *2 free: 000060E5A55DCC00, unused: 384
+2025/05/05 21:45:07 [debug] 1070#1070: worker cycle
+2025/05/05 21:45:07 [debug] 1070#1070: epoll timer: 3424029
 
 
 
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:6 ev:0001 d:000072E767374010
+2025/05/05 21:47:58 [debug] 1070#1070: accept on 0.0.0.0:443, ready: 0
+2025/05/05 21:47:58 [debug] 1070#1070: posix_memalign: 000060E5A55DCE10:512 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 accept: 10.1.1.7:59784 fd:3
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 3: 60000:4061523
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 epoll add event: fd:3 op:1 ev:80002001
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 170636
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:3 ev:0001 d:000072E7673742F8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http check ssl handshake
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http recv(): 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 https ssl handshake: 0x16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 tcp_nodelay
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL server name: "tea.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL ALPN supported by client: h2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL ALPN supported by client: http/1.1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL ALPN selected: http/1.1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_do_handshake: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 59999
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:3 ev:0001 d:000072E7673742F8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL handshake handler: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_do_handshake: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL: TLSv1.3, cipher: "TLS_AES_128_GCM_SHA256 TLSv1.3 Kx=any Au=any Enc=AESGCM(128) Mac=AEAD"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL reused session
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http wait request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A5593BD0:1024
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: 586
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DB550:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http process request line
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http request line: "GET / HTTP/1.1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http uri: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http args: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http exten: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55C8180:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http process request header line
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Host: tea.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Connection: keep-alive"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Priority: u=0, i"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 3: 4061523
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 test location: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 using configuration "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cl:-1 max:1048576
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 4
+2025/05/05 21:47:58 [debug] 1070#1070: *8 post rewrite phase: 5
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 6
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 7
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 10
+2025/05/05 21:47:58 [debug] 1070#1070: *8 OIDC (auth_lab)
+2025/05/05 21:47:58 [debug] 1070#1070: *8 parse header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A53D6F30:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http subrequest "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http posted request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 test location: "/auth_lab"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 using configuration "=/auth_lab"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cl:103 max:1048576
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 4
+2025/05/05 21:47:58 [debug] 1070#1070: *8 post rewrite phase: 5
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 6
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 7
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 15
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 17
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script var: "https://cafe.lab.f5npi.net/token"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http init upstream, client timer: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 epoll add event: fd:3 op:3 ev:80002005
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Host"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script var: "cafe.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Connection"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Content-Length"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script var: "103"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Type: application/x-www-form-urlencoded"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Authorization: Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ="
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header:
+"POST /token HTTP/1.0
+Host: cafe.lab.f5npi.net
+Connection: close
+Content-Length: 103
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic MTIzNDpteXByaXZhdGVjbGllbnRzZWNyZXQ=
 
+"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55CB1A0:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cleanup add: 000060E5A53D7EF0
+2025/05/05 21:47:58 [debug] 1070#1070: malloc: 000060E5A55D7AF0:224
+2025/05/05 21:47:58 [debug] 1070#1070: resolve: "cafe.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: resolve cached
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream resolve: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 name was resolved to 10.1.1.7
+2025/05/05 21:47:58 [debug] 1070#1070: resolve name done: 0
+2025/05/05 21:47:58 [debug] 1070#1070: resolver expire
+2025/05/05 21:47:58 [debug] 1070#1070: *8 get rr peer, try: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 stream socket 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:47:58 [debug] 1070#1070: *8 connect to 10.1.1.7:443, fd:13 #9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream connect: -2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DAAC0:128 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061527
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: -4, "/auth_lab?" a:1, c:3
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http request count:3 blk:0
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 3
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:3 ev:0004 d:000072E7673742F8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http run request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream check client, write event:1, "/auth_lab"
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 59999
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55DF130:96
+2025/05/05 21:47:58 [debug] 1070#1070: *8 upstream SSL server name: "cafe.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 tcp_nodelay
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_do_handshake: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 59998
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL handshake handler: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 verify:1, error:0, depth:2, subject:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 verify:1, error:0, depth:1, subject:"/C=US/O=Let's Encrypt/CN=E6", issuer:"/C=US/O=Internet Security Research Group/CN=ISRG Root X1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 verify:1, error:0, depth:0, subject:"/CN=cafe.lab.f5npi.net", issuer:"/C=US/O=Let's Encrypt/CN=E6"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_do_handshake: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL: TLSv1.3, cipher: "TLS_AES_256_GCM_SHA384 TLSv1.3 Kx=any Au=any Enc=AESGCM(256) Mac=AEAD"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream ssl handshake: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 X509_check_host(): match
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request body
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer buf fl:0 s:198
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer buf fl:1 s:103
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer in: 000060E5A55CB470
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55DFE90:80
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55E2650:16384
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 198
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 103
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL to write: 301
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_write: 301
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer out: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061527
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061531
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process header
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55CDF70:4096
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream dummy handler
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 2
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process header
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream dummy handler
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 5
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 59995
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0005 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process header
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: 949
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy status 200 "200 OK"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "X-Powered-By: Express"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Type: application/json; charset=utf-8"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Length: 740"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "ETag: W/"2e4-QwTfFuriJsDd7NFRorATsTrB0lQ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Date: Mon, 05 May 2025 21:47:58 GMT"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Connection: close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cacheable: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy filter init s:200 h:0 c:0 l:740
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process upstream
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe read upstream: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe preread: 740
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe buf free s:0 t:1 f:0 000060E5A55CDF70, pos 000060E5A55CE041, size: 740 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe length: 740
+2025/05/05 21:47:58 [debug] 1070#1070: *8 input buf #0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream flush in
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/auth_lab?" 000060E5A55CB450
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter in memory
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter in memory 740 bytes
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer: 13, old: 4061531, new: 4061546
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream exit: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http upstream request: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http proxy request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free rr peer 1 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_shutdown: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 close http upstream connection: 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55E2650
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DFE90
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DF130
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DAAC0, unused: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061531
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream temp fd: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/auth_lab?" 00007FFDE1ACC490
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter in memory
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/auth_lab?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: 0, "/auth_lab?" a:1, c:2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 OIDC (auth_lab): token request done: status 200
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http wake parent request: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http posted request: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 10
+2025/05/05 21:47:58 [debug] 1070#1070: *8 OIDC (auth_lab)
+2025/05/05 21:47:58 [debug] 1070#1070: *8 parse header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55CC1B0:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: slab alloc: 665 slot: 7
+2025/05/05 21:47:58 [debug] 1070#1070: slab alloc: 000072E766811400
+2025/05/05 21:47:58 [debug] 1070#1070: slab free: 000072E766811000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 11
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 12
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 post access phase: 14
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 15
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 17
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http init upstream, client timer: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Host"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script var: "127.0.0.1:8080"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Connection"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Dest: document"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-User: ?1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Priority: u=0, i"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header:
+"GET / HTTP/1.0
+Host: 127.0.0.1:8080
+Connection: close
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br, zstd
+Referer: https://cafe.lab.f5npi.net/
+Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-site
+Sec-Fetch-User: ?1
+Priority: u=0, i
+Pragma: no-cache
+Cache-Control: no-cache
 
+"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cleanup add: 000060E5A55CC180
+2025/05/05 21:47:58 [debug] 1070#1070: *8 get rr peer, try: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 stream socket 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:47:58 [debug] 1070#1070: *8 connect to 127.0.0.1:8080, fd:13 #10
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream connect: -2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DA230:128 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061546
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: -4, "/?" a:1, c:2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http request count:2 blk:0
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: stale event 000072E7673744E8
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 10
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request body
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer buf fl:1 s:578
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer in: 000060E5A55CB470
+2025/05/05 21:47:58 [debug] 1070#1070: *8 writev: 578 of 578
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer out: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061546
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061547
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:7 ev:0001 d:000072E767374108
+2025/05/05 21:47:58 [debug] 1070#1070: accept on 0.0.0.0:8080, ready: 0
+2025/05/05 21:47:58 [debug] 1070#1070: posix_memalign: 000060E5A55DD520:512 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *11 accept: 127.0.0.1:52264 fd:14
+2025/05/05 21:47:58 [debug] 1070#1070: *11 event timer add: 14: 60000:4061547
+2025/05/05 21:47:58 [debug] 1070#1070: *11 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *11 epoll add event: fd:14 op:1 ev:80002001
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:14 ev:0001 d:000072E7673745E1
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http wait request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *11 malloc: 000060E5A55D68B0:1024
+2025/05/05 21:47:58 [debug] 1070#1070: *11 recv: eof:0, avail:-1
+2025/05/05 21:47:58 [debug] 1070#1070: *11 recv: fd:14 578 of 1024
+2025/05/05 21:47:58 [debug] 1070#1070: *11 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 posix_memalign: 000060E5A55E2650:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http process request line
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http request line: "GET / HTTP/1.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http uri: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http args: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http exten: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *11 posix_memalign: 000060E5A55E3660:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http process request header line
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Host: 127.0.0.1:8080"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Connection: close"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Referer: https://cafe.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Upgrade-Insecure-Requests: 1"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Sec-Fetch-Dest: document"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Sec-Fetch-Mode: navigate"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Sec-Fetch-Site: same-site"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Sec-Fetch-User: ?1"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Priority: u=0, i"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http header done
+2025/05/05 21:47:58 [debug] 1070#1070: *11 event timer del: 14: 4061547
+2025/05/05 21:47:58 [debug] 1070#1070: *11 generic phase: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 generic phase: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *11 rewrite phase: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *11 test location: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 using configuration "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http cl:-1 max:1048576
+2025/05/05 21:47:58 [debug] 1070#1070: *11 rewrite phase: 4
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http set discard body
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http script copy: "Hello, "
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http script copy: "!
+Email: "
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http script copy: "
+IdP sub: "
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http script copy: "
+auth: "
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http script copy: "
+"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:47:58 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: close
+
+2025/05/05 21:47:58 [debug] 1070#1070: *11 write new buf t:1 f:0 000060E5A55E3BD0, pos 000060E5A55E3BD0, size: 143 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http write filter: l:0 f:0 s:143
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http output filter "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http copy filter: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http postpone filter "/?" 00007FFDE1ACC3E0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 write old buf t:1 f:0 000060E5A55E3BD0, pos 000060E5A55E3BD0, size: 143 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 write new buf t:0 f:0 0000000000000000, pos 000060E5A55E35D0, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http write filter: l:1 f:0 s:177
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http write filter limit 2097152
+2025/05/05 21:47:58 [debug] 1070#1070: *11 writev: 177 of 177
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http write filter 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http copy filter: 0 "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http finalize request: 0, "/?" a:1, c:1
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http request count:1 blk:0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http close request
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *11 http session log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *11 free: 000060E5A55E2650, unused: 8
+2025/05/05 21:47:58 [debug] 1070#1070: *11 free: 000060E5A55E3660, unused: 2167
+2025/05/05 21:47:58 [debug] 1070#1070: *11 close http connection: 14
+2025/05/05 21:47:58 [debug] 1070#1070: *11 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 free: 000060E5A55D68B0
+2025/05/05 21:47:58 [debug] 1070#1070: *11 free: 000060E5A55DD520, unused: 128
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:2005 d:000072E7673744E8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process header
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55E2650:4096
+2025/05/05 21:47:58 [debug] 1070#1070: *8 recv: eof:1, avail:-1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 recv: fd:13 177 of 4096
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy status 200 "200 OK"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Server: nginx/1.27.4"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Date: Mon, 05 May 2025 21:47:58 GMT"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Type: text/plain"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Length: 34"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Connection: close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:47:58 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: keep-alive
+
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:1 f:0 000060E5A55CD078, pos 000060E5A55CD078, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:0 f:0 s:148
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cacheable: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55E3660:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy filter init s:200 h:0 c:0 l:34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process upstream
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe read upstream: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe preread: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 readv: eof:1, avail:0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 readv: 1, last:3919
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe recv chain: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe buf free s:0 t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe length: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 input buf #0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream flush in
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/?" 000060E5A55CD130
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55CD078, pos 000060E5A55CD078, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:0 f:0 s:182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer: 13, old: 4061547, new: 4061548
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream exit: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http upstream request: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http proxy request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free rr peer 1 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 close http upstream connection: 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DA230, unused: 48
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061547
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+
+==> /var/log/nginx/access.log <==
+127.0.0.1 - - [05/May/2025:21:47:58 +0000] "GET / HTTP/1.0" 200 34 "https://cafe.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream temp fd: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/?" 00007FFDE1ACC490
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55CD078, pos 000060E5A55CD078, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:0 f:0 0000000000000000, pos 0000000000000000, size: 0 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:1 f:0 s:182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter limit 2097152
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DD520:512 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55CEF80:16384
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 148
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL to write: 182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_write: 182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: 0, "/?" a:1, c:1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 set http keepalive handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http close request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http session log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55E2650
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55CDF70
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DB550, unused: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55C8180, unused: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A53D6F30, unused: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55CB1A0, unused: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55CC1B0, unused: 16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55E3660, unused: 3368
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A5593BD0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 hc free: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 hc busy: 0000000000000000 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55CEF80
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 3: 75000:4076548
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 75000
+
+==> /var/log/nginx/access.log <==
+10.1.1.7 - - [05/May/2025:21:47:58 +0000] "GET / HTTP/1.1" 200 34 "https://cafe.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:3 ev:0005 d:000072E7673742F8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http keepalive handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A5593BD0:1024
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: 547
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_read: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_get_error: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A53D6F30:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 3: 4076548
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http process request line
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http request line: "GET /favicon.ico HTTP/1.1"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http uri: "/favicon.ico"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http args: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http exten: "ico"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55C8180:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http process request header line
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Host: tea.lab.f5npi.net"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Connection: keep-alive"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Referer: https://tea.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Dest: image"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Mode: no-cors"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Sec-Fetch-Site: same-origin"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Priority: u=6"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http header done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 test location: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 using configuration "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cl:-1 max:1048576
+2025/05/05 21:47:58 [debug] 1070#1070: *8 rewrite phase: 4
+2025/05/05 21:47:58 [debug] 1070#1070: *8 post rewrite phase: 5
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 6
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 7
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 8
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 10
+2025/05/05 21:47:58 [debug] 1070#1070: *8 OIDC (auth_lab)
+2025/05/05 21:47:58 [debug] 1070#1070: *8 parse header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 11
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 12
+2025/05/05 21:47:58 [debug] 1070#1070: *8 access phase: 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 post access phase: 14
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 15
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 generic phase: 17
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http init upstream, client timer: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Host"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script var: "127.0.0.1:8080"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "Connection"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: "close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http script copy: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Referer: https://tea.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Dest: image"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Mode: no-cors"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Sec-Fetch-Site: same-origin"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Priority: u=6"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header:
+"GET /favicon.ico HTTP/1.0
+Host: 127.0.0.1:8080
+Connection: close
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0
+Accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br, zstd
+Referer: https://tea.lab.f5npi.net/
+Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd
+Sec-Fetch-Dest: image
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+Priority: u=6
+Pragma: no-cache
+Cache-Control: no-cache
+
+"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DB550:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cleanup add: 000060E5A53D7F18
+2025/05/05 21:47:58 [debug] 1070#1070: *8 get rr peer, try: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 stream socket 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 epoll add connection: fd:13 ev:80002005
+2025/05/05 21:47:58 [debug] 1070#1070: *8 connect to 127.0.0.1:8080, fd:13 #12
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream connect: -2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 posix_memalign: 000060E5A55DA230:128 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061595
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: -4, "/favicon.ico?" a:1, c:2
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http request count:2 blk:0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http run request: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream check client, write event:1, "/favicon.ico"
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 47
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:0004 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream send request body
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer buf fl:1 s:539
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer in: 000060E5A55C9170
+2025/05/05 21:47:58 [debug] 1070#1070: *8 writev: 539 of 539
+2025/05/05 21:47:58 [debug] 1070#1070: *8 chain writer out: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061595
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 13: 60000:4061596
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:7 ev:0001 d:000072E767374108
+2025/05/05 21:47:58 [debug] 1070#1070: accept on 0.0.0.0:8080, ready: 0
+2025/05/05 21:47:58 [debug] 1070#1070: posix_memalign: 000060E5A55DDF80:512 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *13 accept: 127.0.0.1:52268 fd:14
+2025/05/05 21:47:58 [debug] 1070#1070: *13 event timer add: 14: 60000:4061596
+2025/05/05 21:47:58 [debug] 1070#1070: *13 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *13 epoll add event: fd:14 op:1 ev:80002001
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 1
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:14 ev:0001 d:000072E7673745E0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http wait request handler
+2025/05/05 21:47:58 [debug] 1070#1070: *13 malloc: 000060E5A55D68B0:1024
+2025/05/05 21:47:58 [debug] 1070#1070: *13 recv: eof:0, avail:-1
+2025/05/05 21:47:58 [debug] 1070#1070: *13 recv: fd:14 539 of 1024
+2025/05/05 21:47:58 [debug] 1070#1070: *13 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 posix_memalign: 000060E5A55E2650:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http process request line
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http request line: "GET /favicon.ico HTTP/1.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http uri: "/favicon.ico"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http args: ""
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http exten: "ico"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 posix_memalign: 000060E5A55E3660:4096 @16
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http process request header line
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Host: 127.0.0.1:8080"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Connection: close"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Accept-Language: en-US,en;q=0.5"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Accept-Encoding: gzip, deflate, br, zstd"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Referer: https://tea.lab.f5npi.net/"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Cookie: NGX_OIDC_SESSION=d8d6d893aa7ff903ee10b6bdc4e194bd"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Sec-Fetch-Dest: image"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Sec-Fetch-Mode: no-cors"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Sec-Fetch-Site: same-origin"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Priority: u=6"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Pragma: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header: "Cache-Control: no-cache"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http header done
+2025/05/05 21:47:58 [debug] 1070#1070: *13 event timer del: 14: 4061596
+2025/05/05 21:47:58 [debug] 1070#1070: *13 generic phase: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 generic phase: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *13 rewrite phase: 2
+2025/05/05 21:47:58 [debug] 1070#1070: *13 test location: "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 using configuration "/"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http cl:-1 max:1048576
+2025/05/05 21:47:58 [debug] 1070#1070: *13 rewrite phase: 4
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http set discard body
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http script copy: "Hello, "
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http script copy: "!
+Email: "
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http script copy: "
+IdP sub: "
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http script copy: "
+auth: "
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http script copy: "
+"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:47:58 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: close
+
+2025/05/05 21:47:58 [debug] 1070#1070: *13 write new buf t:1 f:0 000060E5A55E3BA8, pos 000060E5A55E3BA8, size: 143 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http write filter: l:0 f:0 s:143
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http output filter "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http copy filter: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http postpone filter "/favicon.ico?" 00007FFDE1ACC3E0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 write old buf t:1 f:0 000060E5A55E3BA8, pos 000060E5A55E3BA8, size: 143 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 write new buf t:0 f:0 0000000000000000, pos 000060E5A55E3AE0, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http write filter: l:1 f:0 s:177
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http write filter limit 2097152
+2025/05/05 21:47:58 [debug] 1070#1070: *13 writev: 177 of 177
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http write filter 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http copy filter: 0 "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http finalize request: 0, "/favicon.ico?" a:1, c:1
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http request count:1 blk:0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http close request
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *13 http session log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *13 free: 000060E5A55E2650, unused: 8
+2025/05/05 21:47:58 [debug] 1070#1070: *13 free: 000060E5A55E3660, unused: 2197
+2025/05/05 21:47:58 [debug] 1070#1070: *13 close http connection: 14
+2025/05/05 21:47:58 [debug] 1070#1070: *13 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 free: 000060E5A55D68B0
+2025/05/05 21:47:58 [debug] 1070#1070: *13 free: 000060E5A55DDF80, unused: 128
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 60000
+2025/05/05 21:47:58 [debug] 1070#1070: epoll: fd:13 ev:2005 d:000072E7673744E9
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream request: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process header
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55E2650:4096
+2025/05/05 21:47:58 [debug] 1070#1070: *8 recv: eof:1, avail:-1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 recv: fd:13 177 of 4096
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy status 200 "200 OK"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Server: nginx/1.27.4"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Date: Mon, 05 May 2025 21:47:58 GMT"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Type: text/plain"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Content-Length: 34"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header: "Connection: close"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy header done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 HTTP/1.1 200 OK
+Server: nginx/1.27.4
+Date: Mon, 05 May 2025 21:47:58 GMT
+Content-Type: text/plain
+Content-Length: 34
+Connection: keep-alive
+
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:1 f:0 000060E5A55DB8F0, pos 000060E5A55DB8F0, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:0 f:0 s:148
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http cacheable: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http proxy filter init s:200 h:0 c:0 l:34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream process upstream
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe read upstream: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe preread: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 readv: eof:1, avail:0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 readv: 1, last:3919
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe recv chain: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe buf free s:0 t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe length: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 input buf #0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream flush in
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/favicon.ico?" 000060E5A55DBAC0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55DB8F0, pos 000060E5A55DB8F0, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:0 f:0 s:182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 pipe write downstream done
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer: 13, old: 4061596, new: 4061596
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream exit: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http upstream request: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 finalize http proxy request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free rr peer 1 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 close http upstream connection: 13
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DA230, unused: 48
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer del: 13: 4061596
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http upstream temp fd: -1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http output filter "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http postpone filter "/favicon.ico?" 00007FFDE1ACC490
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55DB8F0, pos 000060E5A55DB8F0, size: 148 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write old buf t:1 f:0 000060E5A55E2650, pos 000060E5A55E26DF, size: 34 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 write new buf t:0 f:0 0000000000000000, pos 0000000000000000, size: 0 file: 0, size: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter: l:1 f:0 s:182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter limit 2097152
+2025/05/05 21:47:58 [debug] 1070#1070: *8 malloc: 000060E5A55CB1A0:16384
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 148
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL buf copy: 34
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL to write: 182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 SSL_write: 182
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http write filter 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http copy filter: 0 "/favicon.ico?"
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http finalize request: 0, "/favicon.ico?" a:1, c:1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 set http keepalive handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http close request
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http log handler
+
+==> /var/log/nginx/access.log <==
+127.0.0.1 - - [05/May/2025:21:47:58 +0000] "GET /favicon.ico HTTP/1.0" 200 34 "https://tea.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+10.1.1.7 - - [05/May/2025:21:47:58 +0000] "GET /favicon.ico HTTP/1.1" 200 34 "https://tea.lab.f5npi.net/" "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0" "-"
+
+==> /var/log/nginx/error.log <==
+2025/05/05 21:47:58 [debug] 1070#1070: *8 http session log handler
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55E2650
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A53D6F30, unused: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55C8180, unused: 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55DB550, unused: 2166
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A5593BD0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 hc free: 0000000000000000
+2025/05/05 21:47:58 [debug] 1070#1070: *8 hc busy: 0000000000000000 0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 free: 000060E5A55CB1A0
+2025/05/05 21:47:58 [debug] 1070#1070: *8 reusable connection: 1
+2025/05/05 21:47:58 [debug] 1070#1070: *8 event timer add: 3: 75000:4076596
+2025/05/05 21:47:58 [debug] 1070#1070: timer delta: 0
+2025/05/05 21:47:58 [debug] 1070#1070: worker cycle
+2025/05/05 21:47:58 [debug] 1070#1070: epoll timer: 75000
+
+```
+</details>
