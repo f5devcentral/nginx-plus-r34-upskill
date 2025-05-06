@@ -6,7 +6,7 @@ order: 5
 
 ## Introduction
 
-NGNIX Plus r34 includes a new native [OpenID Connect](https://openid.net/developers/how-connect-works/) implementation.
+NGINX Plus r34 includes a new native [OpenID Connect](https://openid.net/developers/how-connect-works/) implementation.
 
 This new implementation is intended to replace the NGINX Inc [nginx-openid-connect Reference Implementation](https://github.com/nginxinc/nginx-openid-connect) with a native and supported solution. NGINX Plus's simplified OIDC Client architecture includes aspects of an _OpenID Connect Client_ together with aspects of a _Resource Server_. By combining these roles into a single architecture with shared data, far fewer cryptographic operations are required when compared to a typical OpenID Connect + OAuth system with separated roles.
 
@@ -50,6 +50,9 @@ It may be easiest to understand this feature by contrasting it with a typical di
 
 ### Typical OpenID Connect Architecture
 
+![OIDC Architecture](media/5-oidc/OIDCArch.png)
+
+
 ```mermaid
 %%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%%
 graph TD
@@ -63,18 +66,18 @@ In a typical client architecture, the _Resource Server_ and the _OpenID Connect 
 
 &nbsp;
 
-### NGINX OpenID Connect Client Anchitecture
+### NGINX OpenID Connect Client Architecture
 
-<img src="media/5-oidc/nginx-oidc-architecture.png" width="35%" />
+![OIDC Architecture](media/5-oidc/nginx-oidc-architecture.png)
 
-```
-%%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%%
-graph TD
-User["User: User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"]
-User --> NGINXPlus["OpenID Connect Client: Validates Authentication Server, Obtains and Stores Tokens"]
-NGINXPlus --> AuthServer
-NGINXPlus["<b>NGINX Plus</b><br>Validates Authentication Server, Obtains and Stores Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"]
-```
+{/* ``` */}
+{/* %%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%% */}
+{/* graph TD */}
+{/* User["User: User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"] */}
+{/* User --> NGINXPlus["OpenID Connect Client: Validates Authentication Server, Obtains and Stores Tokens"] */}
+{/* NGINXPlus --> AuthServer */}
+{/* NGINXPlus["<b>NGINX Plus</b><br>Validates Authentication Server, Obtains and Stores Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"] */}
+{/* ``` */}
 
 NGINX Plus' combined system establishes the root of trust using the Authentication Server's certificate in the HTTPS connection during retrieval of the [well-known OAuth metadata](https://datatracker.ietf.org/doc/html/rfc8414) and the subsequent retrieval of the JWT ID Token and Bearer Token. Because the tokens are stored and operated on inside NGINX Plus itself, they do not require additional validation by an external Resource Server. The user's session is tracked using a standard HTTP cookie, and the authenticated JWTs are used during the session.
 
@@ -84,33 +87,37 @@ NGINX Plus' combined system establishes the root of trust using the Authenticati
 
 This diagram illustrates a typical user logon.
 
-```mermaid
+![OIDC Seq Diagram](media/5-oidc/OIDCDiagram.png)
 
-sequenceDiagram
-    participant End_User
-    participant NGINX_Plus
-    participant Authorization_Server
-    participant DNS_Server
 
-    End_User->>NGINX_Plus: Request protected web content
-    activate NGINX_Plus
-    NGINX_Plus->>DNS_Server: DNS Resolves the OIDC server
-    DNS_Server-->>NGINX_Plus: DNS response
-    NGINX_Plus->>Authorization_Server: Request Preconfigured well-known OAuth Metadata to discover Authorize and Token endpoints
-    NGINX_Plus->>End_User: Responds with HTTP 302 to authorize endpoint<br>OpenID parameters (response_type, scope, client_id, redirect_uri, state, nonce)
-    deactivate NGINX_Plus
-    End_User->>Authorization_Server: Browser follows HTTP GET to authorize endpoint
-    Authorization_Server->>Authorization_Server: User completes authentication or logon process
-    Authorization_Server->>End_User: Redirects via 302 to NGINX's redirect_uri /oidc_callback state with Token Code
-    End_User->>NGINX_Plus: End User follows redirect & sends HTTP GET to NGINX with Token Code
-    activate NGINX_Plus
-    NGINX_Plus->>Authorization_Server: Requests tokencode grant at Token endpoint with Token Code
-    Authorization_Server-->>NGINX_Plus: Responds with Access Token, ID Token, and (optionally) Refresh Token
-    Note right of NGINX_Plus: Store Tokens
-    NGINX_Plus->>End_User: Responds with protected web content
-    deactivate NGINX_Plus
 
-```
+{/* ```mermaid */}
+{/*  */}
+{/* sequenceDiagram */}
+{/*     participant End_User */}
+{/*     participant NGINX_Plus */}
+{/*     participant Authorization_Server */}
+{/*     participant DNS_Server */}
+{/*  */}
+{/*     End_User->>NGINX_Plus: Request protected web content */}
+{/*     activate NGINX_Plus */}
+{/*     NGINX_Plus->>DNS_Server: DNS Resolves the OIDC server */}
+{/*     DNS_Server-->>NGINX_Plus: DNS response */}
+{/*     NGINX_Plus->>Authorization_Server: Request Preconfigured well-known OAuth Metadata to discover Authorize and Token endpoints */}
+{/*     NGINX_Plus->>End_User: Responds with HTTP 302 to authorize endpoint<br>OpenID parameters (response_type, scope, client_id, redirect_uri, state, nonce) */}
+{/*     deactivate NGINX_Plus */}
+{/*     End_User->>Authorization_Server: Browser follows HTTP GET to authorize endpoint */}
+{/*     Authorization_Server->>Authorization_Server: User completes authentication or logon process */}
+{/*     Authorization_Server->>End_User: Redirects via 302 to NGINX's redirect_uri /oidc_callback state with Token Code */}
+{/*     End_User->>NGINX_Plus: End User follows redirect & sends HTTP GET to NGINX with Token Code */}
+{/*     activate NGINX_Plus */}
+{/*     NGINX_Plus->>Authorization_Server: Requests tokencode grant at Token endpoint with Token Code */}
+{/*     Authorization_Server-->>NGINX_Plus: Responds with Access Token, ID Token, and (optionally) Refresh Token */}
+{/*     Note right of NGINX_Plus: Store Tokens */}
+{/*     NGINX_Plus->>End_User: Responds with protected web content */}
+{/*     deactivate NGINX_Plus */}
+{/*  */}
+{/* ``` */}
 
 &nbsp;
 
@@ -279,7 +286,7 @@ For this lab, we'll set up details from the _cafe.lab.f5npi.net_ lab Authorizati
 
 Log in to [udf.f5.com](udf.f5.com), click **Blueprints**, then find "SDE NGINX Plus R34 Upskilling" and **Deploy** it.
 
-<img src="media/5-oidc/udf-start.png" width="45%" />
+![UDF Start](media/5-oidc/udf-start.png)
 
 After it's deployed, click **Deployments** on the left nav, find the deployment, then click **Start** to boot the lab. Accept the default resources, set the desired duration, then click **Start**
 
@@ -399,7 +406,7 @@ Let's now browse to the web service and observe what happens.
 2. Click **Jumphost**, then **Details** >> **Access** >> **Firefox Browser** to open a browser running on the jump host. The browser will open in a new browser tab.
 3. Within the Firefox "browser-in-a-browser-tab", Navigate to `https://tea.lab.f5npi.net`
 
-<img src="media/5-oidc/ff-browse-to-tea.png" width="35%" />
+![Browse to Tea](media/5-oidc/ff-browse-to-tea.png)
 
 In these first few steps, NGINX has performed a DNS lookup on the `oidc-provider hostname`, visited the `well-known` endpoint, and redirected the end user's Firefox client to the Authorize endpoint with a [_nonce_](https://en.wikipedia.org/wiki/Cryptographic_nonce). Next, the Firefox browser follows the redirect.
 
