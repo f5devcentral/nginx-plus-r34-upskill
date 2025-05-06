@@ -181,7 +181,7 @@ At normal log level, here are some common errors that engineers may encounter.
 [error] 1094#1094: *2 OIDC (auth_lab): failed to fetch metadata: status 0 while sending to client, client: 10.1.1.10, server: tea.lab.f5npi.net, request: "GET / HTTP/1.1", subrequest: "/auth_lab", upstream: "https://10.1.1.10:443/.well-known/openid-configuration", host: "tea.lab.f5npi.net"
 ```
 
-Note: In this situation NGINX Plus logs its own `http.server.server_name` rather than the Authentication Server's hostname. Check the `http.oidc_provider.<your oidc object name>.issuer` in _nginx.conf_ to find it.
+Note: In this situation NGINX Plus logs its own `http.server.server_name` rather than the Authentication Server's hostname. Check the `http.oidc_provider.<your oidc object name>.issuer` in *nginx.conf* to find it.
 
 **Remedy**
 
@@ -237,7 +237,7 @@ This demo uses two hosts.
 * Jump Host
 
   * Firefox Browser to simulate an end user's browser
-  * Mock _cafe.lab.f5npi.net_ Lab OpenID Connect Authentication Server: `/home/ubuntu/oidc-server/oidc-server.js`
+  * Mock *cafe.lab.f5npi.net* Lab OpenID Connect Authentication Server: `/home/ubuntu/oidc-server/oidc-server.js`
   * SSL Certificates: `/home/ubuntu/oidc-server/cafe.lab.f5npi.net`
   * Mock DNS Server
 
@@ -271,15 +271,15 @@ Feel free to edit the Authentication Server code to add extra behaviors. Because
 
 ### Details of the OpenID Connect Provider Script
 
-For this lab, we'll set up details from the _cafe.lab.f5npi.net_ lab Authorization Server:
+For this lab, we'll set up details from the *cafe.lab.f5npi.net* lab Authorization Server:
 
 * OAuth Client ID: **1234**
 * OAuth Client Secret: **xyz**
-  * The Cliend ID and Client Secret are used as _HTTP Basic_ credentials by NGINX when contacting the `token` endpoint of the AS
+  * The Cliend ID and Client Secret are used as *HTTP Basic* credentials by NGINX when contacting the `token` endpoint of the AS
 * OpenID Connect Metadata URL: https://cafe.lab.f5npi.net/.well-known/openid-configuration
   * This default value is derived by appending `.well-known/openid-configuration` to the base URL of the AS
 * Resolver: **127.0.0.53**
-  * The local _systemd_ stub resolver allows NGINX to resolve local static hosts: `cafe` and `tea`.
+  * The local *systemd* stub resolver allows NGINX to resolve local static hosts: `cafe` and `tea`.
 * Server Certificates
   * A certificate for **tea.lab.f5npi.net** is included: `tea.lab.f5npi.net.key` & `tea.lab.f5npi.net.pem`.
 
