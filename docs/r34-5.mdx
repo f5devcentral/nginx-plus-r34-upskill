@@ -20,23 +20,23 @@ This feature allows NGINX Plus to **authenticate** users and **obtain claims dat
 
 For example, the website or proxy owners may want to enforce a logon from **Azure**, **Okta**, **Duo**, or other **OpenID Connect AS** before accessing protected content. The site owners may also wish to operate on user information ([claims](https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-token-claims)) provided by the OpenID Connect AS, such as the user's name, email address, profile picture, group data, and the like.
 
-Unlike traditional HTTP or SAML authentication, OAuth requires a 3rd party _OpenID Connect Client_ because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a _proxy_ for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentictaion Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
+Unlike traditional HTTP or SAML authentication, OAuth requires a 3rd party *OpenID Connect Client* because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a *proxy* for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentictaion Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
 
 &nbsp;
 
 ## Further Reading
 
-- Module Documentation: [ngx_http_oidc_module](https://nginx.org/en/docs/http/ngx_http_oidc_module.html)
-- Admin Guide: [Single Sign-On with OpenID Connect and Identity Providers](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/)
-- Technical Article: [Simplifying OIDC and SSO with the New NGINX Plus R34 OIDC Module](https://community.f5.com/kb/technicalarticles/simplifying-oidc-and-sso-with-the-new-nginx-plus-r34-oidc-module/340552)
-- Deployment Guide: [Single Sign-On With Auth0](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/auth0/)
-- Deployment Guide: [Single Sign-On with Amazon Cognito](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/cognito/)
-- Deployment Guide: [Single Sign-On with Microsoft Active Directory Federation Services](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/active-directory-federation-services/)
-- Deployment Guide: [Single Sign-On with Microsoft Entra ID](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/entra-id/)
-- Deployment Guide: [Single Sign-On with Keycloak](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/keycloak/)
-- Deployment Guide: [Single Sign-On with OneLogin](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/onelogin/)
-- Deployment Guide: [Single Sign-On with Okta](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/okta/)
-- Deployment Guide: [Single Sign-On with Ping Identity](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/ping-identity/)
+* Module Documentation: [ngx_http_oidc_module](https://nginx.org/en/docs/http/ngx_http_oidc_module.html)
+* Admin Guide: [Single Sign-On with OpenID Connect and Identity Providers](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/)
+* Technical Article: [Simplifying OIDC and SSO with the New NGINX Plus R34 OIDC Module](https://community.f5.com/kb/technicalarticles/simplifying-oidc-and-sso-with-the-new-nginx-plus-r34-oidc-module/340552)
+* Deployment Guide: [Single Sign-On With Auth0](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/auth0/)
+* Deployment Guide: [Single Sign-On with Amazon Cognito](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/cognito/)
+* Deployment Guide: [Single Sign-On with Microsoft Active Directory Federation Services](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/active-directory-federation-services/)
+* Deployment Guide: [Single Sign-On with Microsoft Entra ID](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/entra-id/)
+* Deployment Guide: [Single Sign-On with Keycloak](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/keycloak/)
+* Deployment Guide: [Single Sign-On with OneLogin](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/onelogin/)
+* Deployment Guide: [Single Sign-On with Okta](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/okta/)
+* Deployment Guide: [Single Sign-On with Ping Identity](https://docs.nginx.com/nginx/deployment-guides/single-sign-on/ping-identity/)
 
 &nbsp;
 
@@ -122,8 +122,6 @@ This diagram illustrates a typical user logon.
 
 &nbsp;
 
-&nbsp;
-
 ---
 
 ### Session Lifetime
@@ -134,14 +132,12 @@ If a token is refreshed, the timeout is reset. Upon refresh failure, the token e
 
 &nbsp;
 
-&nbsp;
-
 #### Token Refresh
 
 NGINX will automatically attempt a Token Refresh upon receiving a new web request when the following are true:
 
-- The OIDC AS's token endpoint originally sent a Refresh Token
-- The [`expires_in`](https://openid.net/specs/openid-connect-basic-1_0-31.html#TokenOK) attribute of the OIDC AS's token response time is reached
+* The OIDC AS's token endpoint originally sent a Refresh Token
+* The [`expires_in`](https://openid.net/specs/openid-connect-basic-1_0-31.html#TokenOK) attribute of the OIDC AS's token response time is reached
 
 If a token refresh fails for some reason, the authentication starts over and the user is redirected to the AS's Authorize endpoint to get another tokencode.
 
@@ -149,12 +145,12 @@ If a token refresh fails for some reason, the authentication starts over and the
 
 ### What features are not implemented that may be expected?
 
-- Proof of Key Code Exchange [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) support. Administrators must preconfigure a
+* Proof of Key Code Exchange [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) support. Administrators must preconfigure a
   Client Secret to bypass this limitation. This type of configuration known as a "private app" or "confidential client",
   as opposed to a "public client" which does not require a pre-shared client secret.
-- Client-Side Logout Support. NGINX's OIDC feature tracks user sessions with a session cookie. Users may remove their sessions by deleting it, typically by closing their browser tab. An alternate solution is listed under **A Simple Logout Workaround** in the DevCentral article [Simplifying OIDC and SSO with the New NGINX Plus R34 OIDC Module](https://community.f5.com/kb/technicalarticles/simplifying-oidc-and-sso-with-the-new-nginx-plus-r34-oidc-module/340552).
-- Server-Side Logout Support. There is no supported mechanism for administrators to list, query, or terminate user sessions. To delete the session database, stop and start the NGINX server.
-- JWT Signature Validation. Because NGINX Plus's unique hybrid OIDC authentication mechanism establishes trust by validating the SSL certificate of the Authorization Server directly, it is not necessary to validate the signatures of the JWTs themselves against a JWK. If NGINX is instead used in a JWT-aware _Resource Server_ capacity, JWT validation is necessary and implementors may use the [ngx_http_auth_jwt_module](https://nginx.org/en/docs/http/ngx_http_auth_jwt_module.html).
+* Client-Side Logout Support. NGINX's OIDC feature tracks user sessions with a session cookie. Users may remove their sessions by deleting it, typically by closing their browser tab. An alternate solution is listed under **A Simple Logout Workaround** in the DevCentral article [Simplifying OIDC and SSO with the New NGINX Plus R34 OIDC Module](https://community.f5.com/kb/technicalarticles/simplifying-oidc-and-sso-with-the-new-nginx-plus-r34-oidc-module/340552).
+* Server-Side Logout Support. There is no supported mechanism for administrators to list, query, or terminate user sessions. To delete the session database, stop and start the NGINX server.
+* JWT Signature Validation. Because NGINX Plus's unique hybrid OIDC authentication mechanism establishes trust by validating the SSL certificate of the Authorization Server directly, it is not necessary to validate the signatures of the JWTs themselves against a JWK. If NGINX is instead used in a JWT-aware *Resource Server* capacity, JWT validation is necessary and implementors may use the [ngx_http_auth_jwt_module](https://nginx.org/en/docs/http/ngx_http_auth_jwt_module.html).
 
 &nbsp;
 
@@ -191,9 +187,9 @@ Note: In this situation NGINX Plus logs its own `http.server.server_name` rather
 
 Ensure that NGINX Plus can validate the certificate of the OIDC Authentication Server.
 
-- Use a publicly trusted certificate on the Authentication Server
-- Add a CA entry to NGINX Plus where the `subject` matches the `issuer` of the Authentication Server's certificate
-- To use a _self-signed_ certificate on your Authentication Server, place it as a `PEM` on the server and link it inside the [`ssl_trusted_certificate`](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#ssl_trusted_certificate) configuration
+* Use a publicly trusted certificate on the Authentication Server
+* Add a CA entry to NGINX Plus where the `subject` matches the `issuer` of the Authentication Server's certificate
+* To use a *self-signed* certificate on your Authentication Server, place it as a `PEM` on the server and link it inside the [`ssl_trusted_certificate`](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#ssl_trusted_certificate) configuration
 
 ---
 
@@ -206,7 +202,7 @@ Ensure that NGINX Plus can validate the certificate of the OIDC Authentication S
 
 **Remedy**
 
-NGINX Plus uses its own private resolver. Ensure that the Authentication Server's name can be resolved using the resolver specified in the `http.resolver` configuration in `nginx.conf`. In Linux, it may also be possible to use _systemd's_ [`systemd-resolved`](https://manpages.ubuntu.com/manpages/jammy/man8/systemd-resolved.service.8.html), typically at `127.0.0.53`
+NGINX Plus uses its own private resolver. Ensure that the Authentication Server's name can be resolved using the resolver specified in the `http.resolver` configuration in `nginx.conf`. In Linux, it may also be possible to use *systemd's* [`systemd-resolved`](https://manpages.ubuntu.com/manpages/jammy/man8/systemd-resolved.service.8.html), typically at `127.0.0.53`
 
 ---
 
@@ -238,17 +234,17 @@ Log in to [LearnF5](https://f5u.csod.com/), then click the link below to watch t
 
 This demo uses two hosts.
 
-- Jump Host
+* Jump Host
 
-  - Firefox Browser to simulate an end user's browser
-  - Mock _cafe.lab.f5npi.net_ Lab OpenID Connect Authentication Server: `/home/ubuntu/oidc-server/oidc-server.js`
-  - SSL Certificates: `/home/ubuntu/oidc-server/cafe.lab.f5npi.net`
-  - Mock DNS Server
+  * Firefox Browser to simulate an end user's browser
+  * Mock _cafe.lab.f5npi.net_ Lab OpenID Connect Authentication Server: `/home/ubuntu/oidc-server/oidc-server.js`
+  * SSL Certificates: `/home/ubuntu/oidc-server/cafe.lab.f5npi.net`
+  * Mock DNS Server
 
-- NGINX R34 #1
-  - Pre-licensed NGINX Plus R34
-  - OIDC configuration: `/home/ubuntu/oidc/nginx.conf`
-  - SSL Certificates (tea.lab.f5npi.net): `/home/ubuntu/oidc/tea.lab.f5npi.net`
+* NGINX R34 #1
+  * Pre-licensed NGINX Plus R34
+  * OIDC configuration: `/home/ubuntu/oidc/nginx.conf`
+  * SSL Certificates (tea.lab.f5npi.net): `/home/ubuntu/oidc/tea.lab.f5npi.net`
 
 &nbsp;
 
@@ -277,15 +273,15 @@ Feel free to edit the Authentication Server code to add extra behaviors. Because
 
 For this lab, we'll set up details from the _cafe.lab.f5npi.net_ lab Authorization Server:
 
-- OAuth Client ID: **1234**
-- OAuth Client Secret: **xyz**
-  - The Cliend ID and Client Secret are used as _HTTP Basic_ credentials by NGINX when contacting the `token` endpoint of the AS
-- OpenID Connect Metadata URL: https://cafe.lab.f5npi.net/.well-known/openid-configuration
-  - This default value is derived by appending `.well-known/openid-configuration` to the base URL of the AS
-- Resolver: **127.0.0.53**
-  - The local _systemd_ stub resolver allows NGINX to resolve local static hosts: `cafe` and `tea`.
-- Server Certificates
-  - A certificate for **tea.lab.f5npi.net** is included: `tea.lab.f5npi.net.key` & `tea.lab.f5npi.net.pem`.
+* OAuth Client ID: **1234**
+* OAuth Client Secret: **xyz**
+  * The Cliend ID and Client Secret are used as _HTTP Basic_ credentials by NGINX when contacting the `token` endpoint of the AS
+* OpenID Connect Metadata URL: https://cafe.lab.f5npi.net/.well-known/openid-configuration
+  * This default value is derived by appending `.well-known/openid-configuration` to the base URL of the AS
+* Resolver: **127.0.0.53**
+  * The local _systemd_ stub resolver allows NGINX to resolve local static hosts: `cafe` and `tea`.
+* Server Certificates
+  * A certificate for **tea.lab.f5npi.net** is included: `tea.lab.f5npi.net.key` & `tea.lab.f5npi.net.pem`.
 
 ### Start UDF lab
 
@@ -306,7 +302,7 @@ The jump host has javascript-based server code that implements a simple OpenID C
 1. Navigate to the Deployment, then click **Components**.
 2. Click **Jumphost**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
 3. Change to the ubuntu user: `su ubuntu - `
-4. Switch to the _oidc-as_ directory in ubuntu's homedir: `cd /home/ubuntu/oidc-as`
+4. Switch to the *oidc-as* directory in ubuntu's homedir: `cd /home/ubuntu/oidc-as`
 5. Refresh the lab certificates: `./refresh_certificates.sh`
 6. Run the server: `./run.sh`
 7. Leave this terminal running so we can watch the logs later.
@@ -422,9 +418,9 @@ Let's now browse to the web service and observe what happens.
 
 ![Browse to Tea](media/5-oidc/ff-browse-to-tea.png)
 
-In these first few steps, NGINX has performed a DNS lookup on the `oidc-provider hostname`, visited the `well-known` endpoint, and redirected the end user's Firefox client to the Authorize endpoint with a [_nonce_](https://en.wikipedia.org/wiki/Cryptographic_nonce). Next, the Firefox browser follows the redirect.
+In these first few steps, NGINX has performed a DNS lookup on the `oidc-provider hostname`, visited the `well-known` endpoint, and redirected the end user's Firefox client to the Authorize endpoint with a [*nonce*](https://en.wikipedia.org/wiki/Cryptographic_nonce). Next, the Firefox browser follows the redirect.
 
-Observe the result from these events the Authentictaion Server terminal
+Observe the result from these events the Authentication Server terminal
 
 <Collapsible title="Example Authentication Server Log - NGINX Hits Metadata Endpoint">
 
@@ -475,10 +471,10 @@ This implements a minimal Authentication Server logon process.
 1. Use Firefox to submit any username and password to the forms logon page.
 2. Switch back to the Authentication Server terminal and observe the activity. Review the events:
 
-   - The client browser POSTs the username and password to the Authentication Server's authorize-logon endpoint
-   - The Authentication Server responds to the POST with a redirect to the Authentication Server. This redirect contains the _tokencode_
-   - NGINX uses this _tokencode_ and its pre-configured _client secret_ against the Authentication Server's token endpoint
-   - The Authentication Server responds to NGINX with the OAuth _Bearer Token_ and OIDC _ID Token_
+   * The client browser POSTs the username and password to the Authentication Server's authorize-logon endpoint
+   * The Authentication Server responds to the POST with a redirect to the Authentication Server. This redirect contains the *tokencode*
+   * NGINX uses this *tokencode* and its pre-configured *client secret* against the Authentication Server's token endpoint
+   * The Authentication Server responds to NGINX with the OAuth *Bearer Token* and OIDC *ID Token*
 
 &nbsp;
 
