@@ -52,15 +52,16 @@ It may be easiest to understand this feature by contrasting it with a typical di
 
 ![OIDC Architecture](media/5-oidc/OIDCArch.png)
 
+&nbsp;
 
-```mermaid
-%%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%%
-graph TD
-    User["<b>User</b><br>User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"]
-    User --> OpenIDClient["<b>OpenID Connect Client</b><br>Validates Authentication Server, Obtains and Stores Tokens"]
-    OpenIDClient --> AuthServer
-    OpenIDClient --> ResourceServer["<b>Resource Server</b><br>Validates Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"]
-```
+{/* ```mermaid */}
+{/* %%{init: {'flowchart': {'defaultRenderer': 'elk'}}}%% */}
+{/* graph TD */}
+{/*     User["<b>User</b><br>User's web browser"] --> AuthServer["<b>Authentication Server</b><br>Provides HTTPS, Provides Tokens, Provides Browser-based User Logon Experience"] */}
+{/*     User --> OpenIDClient["<b>OpenID Connect Client</b><br>Validates Authentication Server, Obtains and Stores Tokens"] */}
+{/*     OpenIDClient --> AuthServer */}
+{/*     OpenIDClient --> ResourceServer["<b>Resource Server</b><br>Validates Tokens, Operates on Token Claim Data, Provides Browser-based App Experience"] */}
+{/* ``` */}
 
 In a typical client architecture, the _Resource Server_ and the _OpenID Connect Client_ are two separate components that do not share a datastore. The OpenID Connect Client authenticates the Authentication Server using a standard HTTPS connection. The Resource Server then authenticates the Authentication Server indirectly by cryptographic validation of JSON Web Tokens provided by the OpenID Connect Client with JSON Web Keys provided by the Authentication Server. This indirection provides JWT portability, but incurs additional configuration overhead and computational complexity.
 
@@ -121,6 +122,8 @@ This diagram illustrates a typical user logon.
 
 &nbsp;
 
+&nbsp;
+
 ---
 
 ### Session Lifetime
@@ -128,6 +131,8 @@ This diagram illustrates a typical user logon.
 NGINX holds user sessions for the amount of time specified in the [`session_timeout`](https://nginx.org/en/docs/http/ngx_http_oidc_module.html#session_timeout) directive, defaulting to 8 hours.
 
 If a token is refreshed, the timeout is reset. Upon refresh failure, the token entry is removed and the user redirected to the `authorize` endpoint.
+
+&nbsp;
 
 &nbsp;
 
@@ -317,6 +322,12 @@ To configure the server, we'll set the following in an `nginx.conf` configuratio
 3. Change to the ubuntu user: `su ubuntu - `
 4. Switch to the _oidc-as_ directory in ubuntu's homedir: `cd /home/ubuntu/oidc`
 
+1. Navigate to the Deployment, then click **Components**.
+2. Click **NGINX Plus R34 (Part 2)**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
+3. Change to the ubuntu user: ```su ubuntu - ```
+4. Switch to the *oidc-as* directory in ubuntu's homedir: ```cd /home/ubuntu/oidc```
+
+
 Review the [documentation](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/) and set the configuration with the values above.
 
 Carefully review the config file below. Pay special attention to the new OIDC-related parameters.
@@ -387,6 +398,9 @@ mgmt {
 </Collapsible>
 
 &nbsp;
+
+&nbsp;
+
 
 ### Start the NGINX Server
 
