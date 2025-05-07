@@ -1,5 +1,5 @@
 ---
-title: Support for SSL certificate caching 
+title: Support for SSL certificate caching
 description: Instructions for configuring SSL certificate caching for certificates defined with variables
 order: 3
 ---
@@ -10,7 +10,7 @@ This demo illustrates an example configuration for SSL certificate caching
 support that is further extended in the R34 release. This builds on the
 previously added SSL certifcate caching support that was added in 2024.
 
-Blog post: <https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations>.
+Blog post: https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations.
 
 ## Demo Lab
 
@@ -73,6 +73,7 @@ NGINX 1.27.4 introduced significant optimizations for handling SSL certificates,
 #### Key Improvements
 
 1. **Caching During Configuration Load:**
+
    - Certificates, keys, and SSL objects are cached in memory during configuration parsing or reloads. This avoids repeatedly reading the same certificate files from disk.
 
 1. **Dynamic Certificate Caching:**
@@ -115,7 +116,7 @@ http {
 }
 ```
 
-#### **Static Certificates (Full Paths)**
+#### Static Certificates (Full Paths)
 
 - These certificate files (`fullchain.pem` and `privkey.pem`) are cached during the configuration cycle.
 
@@ -151,6 +152,7 @@ http {
 #### Key Points
 
 - **Directive**:
+
   - `ssl_certificate_cache` enables caching for dynamic certificates (`$ssl_server_name`), ensuring subsequent requests reuse cached certificates instead of reloading them.
 
 - **Caching Parameters**:
@@ -172,7 +174,7 @@ To disable SSL object inheritance, configure the directive as a **top-level dire
 user  nginx;
 worker_processes  auto;
 
-error_log  /var/log/nginx/error.log debug; 
+error_log  /var/log/nginx/error.log debug;
 pid        /var/run/nginx.pid;
 
 ssl_object_cache_inheritable off;
@@ -186,10 +188,12 @@ events {
 #### Key Points
 
 - **Inheritance Disabled**:
+
   - When `ssl_object_cache_inheritable` is set to `off`, NGINX will not reuse cached SSL objects (certificates, private keys) between configuration reloads.
   - All SSL objects will be freshly reloaded from their respective files on disk.
 
 - **Immediate Behavior**:
+
   - The directive applies to the **current configuration being reloaded** and prepares the cache for the **next reload**.
   - Complete clearing requires **two reloads** or a **full restart** to take effect.
 
@@ -198,18 +202,18 @@ events {
 
 **Ensure Cache Clearing**:
 
-  Perform two reloads to confirm complete clearing:
+Perform two reloads to confirm complete clearing:
 
-   ```bash
-   sudo systemctl reload nginx
-   sudo systemctl reload nginx
-   ```
+```bash
+sudo systemctl reload nginx
+sudo systemctl reload nginx
+```
 
-  Alternatively, restart the service:
+Alternatively, restart the service:
 
-   ```bash
-   sudo systemctl restart nginx
-   ```
+```bash
+sudo systemctl restart nginx
+```
 
 #### Test Static Certificate Caching
 
@@ -226,6 +230,7 @@ events {
    ```
 
 1. **Observe Behavior**
+
    - The server continues responding because NGINX is using the cached SSL context.
 
 1. **Reload NGINX and check the NGINX error logs:**
@@ -241,8 +246,9 @@ During the reload process, NGINX validates its configuration and checks for the 
 #### Test Dynamic Certificate Caching
 
 1. **Set Up**:
+
    - Configure dynamic SSL loading using `$ssl_server_name`.
-  
+
 1. **Rename Certificate:**
 
    ```bash
@@ -265,9 +271,9 @@ During the test, watch how NGINX uses cached certificates to handle repeat reque
 
 - Test configuration changes carefully using:
 
-   ```bash
-   sudo nginx -t
-   ```
+  ```bash
+  sudo nginx -t
+  ```
 
 ### Up Next
 
