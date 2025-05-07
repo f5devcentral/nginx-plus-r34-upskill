@@ -1,20 +1,35 @@
 ---
+<<<<<<< HEAD
 title: Support for SSL certificate caching 
 description: Instructions for configuring SSL certificate caching for certificates defined with variables
+=======
+title: Support for SSL certificate caching
+description: Instructions for configuring SSL certificate caching for the
+>>>>>>> main
 order: 3
 ---
 
 ## Introduction
 
 This demo illustrates an example configuration for SSL certificate caching
+<<<<<<< HEAD
 support that is further extended in the R34 release. This builds on the
 previously added SSL certifcate caching support that was added in 2024.
 
 Blog post: <https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations>.
+=======
+support that is further extended in the R345 release. This builds on the
+previously added SSL certificate caching support that was added in 2024.
+Blog post:
+https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations.
+
+![NGINX Plus Forward Proxy Support for E&V](media/demo/2.png)
+>>>>>>> main
 
 ## Demo Lab
 
 This demo video will show the following parts:
+<<<<<<< HEAD
 
 1. Configure NGINX Plus to cache static SSL certificates.
 1. Configure NGINX Plus to cache dynamic SSL certificates with variables.
@@ -22,6 +37,13 @@ This demo video will show the following parts:
 1. Confirm that caching and inheritance are working as expected.
 
 ---
+=======
+
+1. Configuring NGINX Plus to cache SSL certificates.
+1. Confirm success.
+
+<br />
+>>>>>>> main
 
 Click on the link below which will take you to the demo video.
 
@@ -29,7 +51,13 @@ Click on the link below which will take you to the demo video.
 
 > You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
 
+<<<<<<< HEAD
 ### New Directives
+=======
+## Configuration
+
+### New directives
+>>>>>>> main
 
 The following new directives were added for SSL Certificate Caching in this
 release:
@@ -44,6 +72,7 @@ release:
 
 NGINX 1.27.4 introduced significant optimizations for handling SSL certificates, aimed at reducing configuration load times and improving resource usage for complex SSL configurations. This training will focus on:
 
+<<<<<<< HEAD
 1. How SSL certificate caching works.
 1. Key improvements in NGINX 1.27.4.
 1. Steps to configure and demonstrate the feature.
@@ -270,5 +299,8 @@ During the test, watch how NGINX uses cached certificates to handle repeat reque
    ```
 
 ### Up Next
+=======
+## Up Next
+>>>>>>> main
 
 The next section will cover the Native OIDC implementation included in R34.
