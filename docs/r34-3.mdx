@@ -1,7 +1,6 @@
 ---
 title: Support for SSL certificate caching 
-description: Instructions for configuring SSL certificate caching for the
-forward proxy
+description: Instructions for configuring SSL certificate caching for certificates defined with variables
 order: 3
 ---
 
@@ -22,7 +21,7 @@ This demo video will show the following parts:
 1. Configure NGINX Plus to turn off inheritance between the configuration cycles
 1. Confirm that caching and inheritance are working as expected.
 
-<br/>
+---
 
 Click on the link below which will take you to the demo video.
 
@@ -159,6 +158,59 @@ http {
   - `inactive=30s`: Cached objects not used for 30 seconds are marked as inactive.
   - `valid=5m`: Objects remain valid for 5 minutes before being revalidated.
 
+### Configuring `ssl_object_cache_inheritable` Directive
+
+The `ssl_object_cache_inheritable off` directive disables inheritance of cached SSL objects (e.g., certificates, private keys) across configuration reloads. This ensures that all SSL objects are fully reloaded from disk, avoiding potential issues with reused cached objects. This directive can be useful when you want to ensure complete cache clearing during reloads, but it should be used sparingly due to its performance cost.
+
+#### Example Configuration
+
+To disable SSL object inheritance, configure the directive as a **top-level directive** in your `nginx.conf` file.
+
+```nginx
+# File: /etc/nginx/nginx.conf
+
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log debug; 
+pid        /var/run/nginx.pid;
+
+ssl_object_cache_inheritable off;
+
+events {
+    worker_connections  1024;
+}
+...
+```
+
+#### Key Points
+
+- **Inheritance Disabled**:
+  - When `ssl_object_cache_inheritable` is set to `off`, NGINX will not reuse cached SSL objects (certificates, private keys) between configuration reloads.
+  - All SSL objects will be freshly reloaded from their respective files on disk.
+
+- **Immediate Behavior**:
+  - The directive applies to the **current configuration being reloaded** and prepares the cache for the **next reload**.
+  - Complete clearing requires **two reloads** or a **full restart** to take effect.
+
+- **When to Use**:
+  - Use this directive if changes to disk-based SSL objects (e.g., certificates, keys) require full reloading without retaining previously cached data after configuration reloads.
+
+**Ensure Cache Clearing**:
+
+  Perform two reloads to confirm complete clearing:
+
+   ```bash
+   sudo systemctl reload nginx
+   sudo systemctl reload nginx
+   ```
+
+  Alternatively, restart the service:
+
+   ```bash
+   sudo systemctl restart nginx
+   ```
+
 #### Test Static Certificate Caching
 
 1. **Send a Request**:
@@ -176,10 +228,12 @@ http {
 1. **Observe Behavior**
    - The server continues responding because NGINX is using the cached SSL context.
 
-1. **Reload NGINX:**
+1. **Reload NGINX and check the NGINX error logs:**
 
    ```bash
    sudo systemctl reload nginx
+
+   cat /var/log/nginx/error.log
    ```
 
 During the reload process, NGINX validates its configuration and checks for the physical availability of certificate files specified in the settings. If the files are missing or inaccessible, the reload will fail because NGINX requires these files to be present to recreate the SSL contexts. This ensures that any changes to the configuration are properly validated before being applied.
@@ -201,7 +255,7 @@ During the reload process, NGINX validates its configuration and checks for the 
    curl https://sslcaching.lab.5npi.net # Use the -v option in curl to see more detail on the SSL handshake
    ```
 
-During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests.
+During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests. However, since we removed the certificate it should fail and log an error message.
 
 ### Best Practices
 
