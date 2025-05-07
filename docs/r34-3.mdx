@@ -9,8 +9,8 @@ order: 3
 This demo illustrates an example configuration for SSL certificate caching
 support that is further extended in the R34 release. This builds on the
 previously added SSL certifcate caching support that was added in 2024.
-Blog post:
-<https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations>.
+
+Blog post: <https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations>.
 
 ## Demo Lab
 
@@ -158,7 +158,7 @@ http {
   - `inactive=30s`: Cached objects not used for 30 seconds are marked as inactive.
   - `valid=5m`: Objects remain valid for 5 minutes before being revalidated.
 
-### Configuring `ssl_object_cache_inheritable` Directive
+### Configuring the ssl_object_cache_inheritable Directive
 
 The `ssl_object_cache_inheritable off` directive disables inheritance of cached SSL objects (e.g., certificates, private keys) across configuration reloads. This ensures that all SSL objects are fully reloaded from disk, avoiding potential issues with reused cached objects. This directive can be useful when you want to ensure complete cache clearing during reloads, but it should be used sparingly due to its performance cost.
 
