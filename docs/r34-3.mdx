@@ -242,14 +242,19 @@ During the reload process, NGINX validates its configuration and checks for the 
 1. **Set Up**:
 
    - Configure dynamic SSL loading using `$ssl_server_name`.
+   - Run the command below to set the `$ssl_server_name` variable.
 
-1. **Rename Certificate:**
+     ```bash
+      source /etc/environment
+      ```
+
+2. **Rename Certificate:**
 
    ```bash
    sudo mv /etc/nginx/ssl/lab.sslcaching.f5npi.net.pem /etc/nginx/ssl/lab.sslcaching.f5npi.net.bak
    ```
 
-1. **Test with** `curl`:
+3. **Test with** `curl`:
 
    ```bash
    curl https://sslcaching.lab.5npi.net # Use the -v option in curl to see more detail on the SSL handshake
