@@ -13,8 +13,6 @@ previously added SSL certifcate caching support that was added in 2024.
 Blog post:
 <https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations>.
 
-![NGINX Plus Forward Proxy Support for E&V](media/demo/2.png)
-
 ## Demo Lab
 
 This demo video will show the following parts:
@@ -78,9 +76,6 @@ NGINX 1.27.4 introduced significant optimizations for handling SSL certificates,
 1. **Caching During Configuration Load:**
    - Certificates, keys, and SSL objects are cached in memory during configuration parsing or reloads. This avoids repeatedly reading the same certificate files from disk.
 
-1. **Selective SSL Context Reuse:**
-   - SSL contexts are shared between parent and child blocks unless conflicting settings are detected.
-
 1. **Dynamic Certificate Caching:**
    - Cache dynamically loaded certificates (e.g., `$ssl_server_name`) to mitigate runtime loading costs for multi-domain setups.
 
@@ -104,8 +99,6 @@ Static SSL certificates (full paths specified in `ssl_certificate` and `ssl_cert
 
 ```nginx
 http {
-    # Set object cache inheritance and caching behavior
-    ssl_object_cache_inheritable off; # Optional: Disable cache inheritance for reloads
 
     server {
         listen 443 ssl;
@@ -123,28 +116,9 @@ http {
 }
 ```
 
-### **Key Points:**
-
 #### **Static Certificates (Full Paths)**
 
 - These certificate files (`fullchain.pem` and `privkey.pem`) are cached during the configuration cycle.
-
-#### **Try it out**
-
-1. Remove the certificate files after starting NGINX:
-
-   ```bash
-   sudo rm /etc/nginx/ssl/fullchain.pem
-   ```
-
-1. Observe that the server continues responding due to cached SSL contexts.
-1. Reload NGINX:
-
-   ```bash
-   sudo systemctl reload nginx
-   ```
-
-Observation: Reload fails because the configuration checks for physical file availability.
 
 ### Configuration for Dynamic Certificates with Variables
 
@@ -156,15 +130,16 @@ Multi-domain servers with certificates generated or mapped dynamically based on 
 
 ```nginx
 http {
-    ssl_certificate_cache max=64 inactive=30s valid=5m; # Enable caching for dynamic certificates
 
     server {
         listen 443 ssl;
         server_name lab.sslcaching.f5npi.net.net;
 
         # Dynamically load certificates based on $ssl_server_name
-        ssl_certificate /etc/nginx/ssl/$ssl_server_name.crt;
+        ssl_certificate /etc/nginx/ssl/$ssl_server_name.pem;
         ssl_certificate_key /etc/nginx/ssl/$ssl_server_name.key;
+
+        ssl_certificate_cache max=64 inactive=30s valid=5m; # Enable caching for dynamic certificates
 
         location / {
             root /var/www/html;
@@ -186,20 +161,16 @@ http {
 
 #### Test Static Certificate Caching
 
-1. **Set Up**:
-   - Configure a static HTTPS server using certificate files.
-
 1. **Send a Request**:
 
    ```bash
    curl -v https://sslcaching.lab.f5npi.net
    ```
 
-1. **Remove Certificates:**
+1. **Rename Certificate:**
 
    ```bash
-   sudo rm /etc/nginx/ssl/fullchain.pem
-   sudo rm /etc/nginx/ssl/privkey.pem
+   sudo mv /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/fullchain.bak
    ```
 
 1. **Observe Behavior**
@@ -211,15 +182,18 @@ http {
    sudo systemctl reload nginx
    ```
 
-**Observation**: Reload fails due to missing certificates.
+During the reload process, NGINX validates its configuration and checks for the physical availability of certificate files specified in the settings. If the files are missing or inaccessible, the reload will fail because NGINX requires these files to be present to recreate the SSL contexts. This ensures that any changes to the configuration are properly validated before being applied.
 
 #### Test Dynamic Certificate Caching
 
 1. **Set Up**:
    - Configure dynamic SSL loading using `$ssl_server_name`.
+  
+1. **Rename Certificate:**
 
-1. **Prepare Certificates**:
-   - Create certificates for `sslcaching.lab.f5npi.net`.
+   ```bash
+   sudo mv /etc/nginx/ssl/lab.sslcaching.f5npi.net.pem /etc/nginx/ssl/lab.sslcaching.f5npi.net.bak
+   ```
 
 1. **Test with** `curl`:
 
@@ -227,12 +201,11 @@ http {
    curl https://sslcaching.lab.5npi.net # Use the -v option in curl to see more detail on the SSL handshake
    ```
 
-1. **Observe Behavior:**
-   - Verify cached certificate loading and reuse. Verify once the valid time expires that NGINX attempts to read the certificates from disk.
+During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests.
 
 ### Best Practices
 
-- Use `ssl_certificate_cache` for dynamic, high-scale setups to optimize performance by caching SSL certificates and keys in memory.
+- Use the `ssl_certificate_cache` directive for dynamic, high-scale setups to optimize performance by caching SSL certificates and keys in memory.
 
 - Enable `ssl_object_cache_inheritable off` if you want the SSL certificate cache to be cleared during reloads, ensuring no objects are inherited between configuration reloads.
 
@@ -241,13 +214,6 @@ http {
    ```bash
    sudo nginx -t
    ```
-
-### Conclusion
-
-- **SSL caching** improves performance by reducing redundant certificate loads.
-- NGINX 1.27.4 introduces enhancements for both static and dynamic setups.
-- These optimizations significantly improve resource efficiency during configuration reloads and HTTPS request handling.
-- Leverage these techniques to better manage SSL certificates in high-scale environments.
 
 ### Up Next
 
