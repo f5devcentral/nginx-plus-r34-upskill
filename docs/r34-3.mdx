@@ -1,47 +1,280 @@
 ---
 title: Support for SSL certificate caching
-description: Instructions for configuring SSL certificate caching for the
+description: Instructions for configuring SSL certificate caching for certificates defined with variables
 order: 3
 ---
 
 ## Introduction
 
 This demo illustrates an example configuration for SSL certificate caching
-support that is further extended in the R345 release. This builds on the
-previously added SSL certificate caching support that was added in 2024.
-Blog post:
-https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations.
+support that is further extended in the R34 release. This builds on the
+previously added SSL certifcate caching support that was added in 2024.
 
-![NGINX Plus Forward Proxy Support for E&V](media/demo/2.png)
+Blog post: https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations.
 
 ## Demo Lab
 
 This demo video will show the following parts:
 
-1. Configuring NGINX Plus to cache SSL certificates.
-1. Confirm success.
+1. Configure NGINX Plus to cache static SSL certificates.
+1. Configure NGINX Plus to cache dynamic SSL certificates with variables.
+1. Configure NGINX Plus to turn off inheritance between the configuration cycles
+1. Confirm that caching and inheritance are working as expected.
 
-<br />
+---
 
 Click on the link below which will take you to the demo video.
 
-[Demo: NGINX R34 Forward Proxy Support forE&V](https://f5u.csod.com/REPLACE-WITH-ViDEO-LINK)
+[Demo: NGINX R34 SSL Certificate Caching](https://f5u.csod.com/REPLACE-WITH-ViDEO-LINK)
 
 > You must be logged into [LearnF5](https://f5u.csod.com/) to access it.
 
-## Configuration
-
-### New directives
+### New Directives
 
 The following new directives were added for SSL Certificate Caching in this
 release:
 
-PLACEHOLDER-insert-directive-details
+- `ssl_object_cache_inheritable`
+- `ssl_certificate_cache`
+- `proxy_ssl_certificate_cache`
+- `grpc_ssl_certificate_cache`
+- `uwsgi_ssl_certificate_cache`
 
-### Example configuration
+## NGINX SSL Certificate Caching Configuration
 
-PLACEHOLDER-insert-example-configuration
+NGINX 1.27.4 introduced significant optimizations for handling SSL certificates, aimed at reducing configuration load times and improving resource usage for complex SSL configurations. This training will focus on:
 
-## Up Next
+1. How SSL certificate caching works.
+1. Key improvements in NGINX 1.27.4.
+1. Steps to configure and demonstrate the feature.
+
+---
+
+### Key Concepts
+
+#### 1. What is an SSL Context?
+
+- An **SSL context** (`SSL_CTX`) in NGINX represents the structure created by OpenSSL to store SSL certificates, private keys, and other cryptographic settings needed for TLS/SSL communication.
+- Creating an SSL context can be **computationally expensive**, especially with multiple server blocks, large configurations, or repeated file accesses.
+
+---
+
+### 2. How Did SSL Handling Work Before?
+
+- In previous versions of NGINX, nested location blocks or server blocks would often re-create SSL contexts if they defined slight differences in configuration (e.g., different `proxy_ssl_certificate`).
+- For configurations with **thousands of locations** or **dynamic certificates**, this led to:
+  - Increased memory usage.
+  - Longer load and reload times.
+
+---
+
+### 3. What Changed in NGINX 1.27.4?
+
+#### Key Improvements
+
+1. **Caching During Configuration Load:**
+
+   - Certificates, keys, and SSL objects are cached in memory during configuration parsing or reloads. This avoids repeatedly reading the same certificate files from disk.
+
+1. **Dynamic Certificate Caching:**
+   - Cache dynamically loaded certificates (e.g., `$ssl_server_name`) to mitigate runtime loading costs for multi-domain setups.
+
+---
+
+### 4. Benefits of SSL Certificate Caching
+
+- Faster NGINX **reloads**: Only changed objects are revalidated or reloaded.
+- Reduced **memory usage**: Certificates and keys are cached in memory and reused instead of being re-parsed.
+- Optimized for dynamic certificates: Improves performance for multi-domain setups.
+
+---
+
+### Configuring SSL Certificate Caching
+
+### 1. Configuration for Static SSL Certificates
+
+Static SSL certificates (full paths specified in `ssl_certificate` and `ssl_certificate_key`) benefit automatically from the caching optimizations introduced in NGINX 1.27.4.
+
+#### Example Configuration: Static Certificates
+
+```nginx
+http {
+
+    server {
+        listen 443 ssl;
+        server_name example.com;
+
+        # Static certificates
+        ssl_certificate /etc/nginx/ssl/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+        location / {
+            root /var/www/html;
+            index index.html;
+        }
+    }
+}
+```
+
+#### Static Certificates (Full Paths)
+
+- These certificate files (`fullchain.pem` and `privkey.pem`) are cached during the configuration cycle.
+
+### Configuration for Dynamic Certificates with Variables
+
+#### Use Case
+
+Multi-domain servers with certificates generated or mapped dynamically based on `$ssl_server_name`.
+
+#### Example Configuration: Dynamic Certificate Loading
+
+```nginx
+http {
+
+    server {
+        listen 443 ssl;
+        server_name lab.sslcaching.f5npi.net.net;
+
+        # Dynamically load certificates based on $ssl_server_name
+        ssl_certificate /etc/nginx/ssl/$ssl_server_name.pem;
+        ssl_certificate_key /etc/nginx/ssl/$ssl_server_name.key;
+
+        ssl_certificate_cache max=64 inactive=30s valid=5m; # Enable caching for dynamic certificates
+
+        location / {
+            root /var/www/html;
+            index index.html;
+        }
+    }
+}
+```
+
+#### Key Points
+
+- **Directive**:
+
+  - `ssl_certificate_cache` enables caching for dynamic certificates (`$ssl_server_name`), ensuring subsequent requests reuse cached certificates instead of reloading them.
+
+- **Caching Parameters**:
+  - `max=64`: Cache up to 64 SSL certificates or keys.
+  - `inactive=30s`: Cached objects not used for 30 seconds are marked as inactive.
+  - `valid=5m`: Objects remain valid for 5 minutes before being revalidated.
+
+### Configuring the ssl_object_cache_inheritable Directive
+
+The `ssl_object_cache_inheritable off` directive disables inheritance of cached SSL objects (e.g., certificates, private keys) across configuration reloads. This ensures that all SSL objects are fully reloaded from disk, avoiding potential issues with reused cached objects. This directive can be useful when you want to ensure complete cache clearing during reloads, but it should be used sparingly due to its performance cost.
+
+#### Example Configuration
+
+To disable SSL object inheritance, configure the directive as a **top-level directive** in your `nginx.conf` file.
+
+```nginx
+# File: /etc/nginx/nginx.conf
+
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log debug;
+pid        /var/run/nginx.pid;
+
+ssl_object_cache_inheritable off;
+
+events {
+    worker_connections  1024;
+}
+...
+```
+
+#### Key Points
+
+- **Inheritance Disabled**:
+
+  - When `ssl_object_cache_inheritable` is set to `off`, NGINX will not reuse cached SSL objects (certificates, private keys) between configuration reloads.
+  - All SSL objects will be freshly reloaded from their respective files on disk.
+
+- **Immediate Behavior**:
+
+  - The directive applies to the **current configuration being reloaded** and prepares the cache for the **next reload**.
+  - Complete clearing requires **two reloads** or a **full restart** to take effect.
+
+- **When to Use**:
+  - Use this directive if changes to disk-based SSL objects (e.g., certificates, keys) require full reloading without retaining previously cached data after configuration reloads.
+
+**Ensure Cache Clearing**:
+
+Perform two reloads to confirm complete clearing:
+
+```bash
+sudo systemctl reload nginx
+sudo systemctl reload nginx
+```
+
+Alternatively, restart the service:
+
+```bash
+sudo systemctl restart nginx
+```
+
+#### Test Static Certificate Caching
+
+1. **Send a Request**:
+
+   ```bash
+   curl -v https://sslcaching.lab.f5npi.net
+   ```
+
+1. **Rename Certificate:**
+
+   ```bash
+   sudo mv /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/fullchain.bak
+   ```
+
+1. **Observe Behavior**
+
+   - The server continues responding because NGINX is using the cached SSL context.
+
+1. **Reload NGINX and check the NGINX error logs:**
+
+   ```bash
+   sudo systemctl reload nginx
+
+   cat /var/log/nginx/error.log
+   ```
+
+During the reload process, NGINX validates its configuration and checks for the physical availability of certificate files specified in the settings. If the files are missing or inaccessible, the reload will fail because NGINX requires these files to be present to recreate the SSL contexts. This ensures that any changes to the configuration are properly validated before being applied.
+
+#### Test Dynamic Certificate Caching
+
+1. **Set Up**:
+
+   - Configure dynamic SSL loading using `$ssl_server_name`.
+
+1. **Rename Certificate:**
+
+   ```bash
+   sudo mv /etc/nginx/ssl/lab.sslcaching.f5npi.net.pem /etc/nginx/ssl/lab.sslcaching.f5npi.net.bak
+   ```
+
+1. **Test with** `curl`:
+
+   ```bash
+   curl https://sslcaching.lab.5npi.net # Use the -v option in curl to see more detail on the SSL handshake
+   ```
+
+During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests. However, since we removed the certificate it should fail and log an error message.
+
+### Best Practices
+
+- Use the `ssl_certificate_cache` directive for dynamic, high-scale setups to optimize performance by caching SSL certificates and keys in memory.
+
+- Enable `ssl_object_cache_inheritable off` if you want the SSL certificate cache to be cleared during reloads, ensuring no objects are inherited between configuration reloads.
+
+- Test configuration changes carefully using:
+
+  ```bash
+  sudo nginx -t
+  ```
+
+### Up Next
 
 The next section will cover the Native OIDC implementation included in R34.
