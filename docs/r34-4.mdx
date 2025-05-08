@@ -20,7 +20,7 @@ This feature allows NGINX Plus to **authenticate** users and **obtain claims dat
 
 For example, the website or proxy owners may want to enforce a logon from **Azure**, **Okta**, **Duo**, or other **OpenID Connect AS** before accessing protected content. The site owners may also wish to operate on user information ([claims](https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-token-claims)) provided by the OpenID Connect AS, such as the user's name, email address, profile picture, group data, and the like.
 
-Unlike traditional HTTP or SAML authentication, OAuth requires a 3rd party *OpenID Connect Client* because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a *proxy* for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentictaion Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
+Unlike traditional HTTP or SAML authentication, OAuth requires a 3rd party *OpenID Connect Client* because browsers do not support OpenID Connect directly. Instead, a web site or app must behave as a *proxy* for this access on the browser's behalf. The OpenID Connect Client provides an [HTTP Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies) to track the browser's session and correlate it with OAuth session data on the server side. Because the provider's Authentication Server and the user's browser communicate independently of NGINX Plus, the provider is free to implement auth of their choice. In this way, NGINX Plus' OIDC Client and the user's browser operate harmoniously to achieve a trouble-free logon experience.
 
 &nbsp;
 
@@ -164,7 +164,7 @@ NGINX Plus team have created deployment guides for various 3rd party IdPs includ
 
 ## Troubleshooting and Debugging
 
-NGINX generally produces self-evident log messages to indicate various problems with the OIDC process. If the log messages do not clearly indicate the problem, it is possible to use debugging techniquest listed in this article:
+NGINX generally produces self-evident log messages to indicate various problems with the OIDC process. If the log messages do not clearly indicate the problem, it is possible to use debugging techniques listed in this article:
 
 [Debugging NGINX](https://docs.nginx.com/nginx/admin-guide/monitoring/debugging/)
 
@@ -285,7 +285,7 @@ For this lab, we'll set up details from the *cafe.lab.f5npi.net* lab Authorizati
 
 ### Start UDF lab
 
-Log in to [udf.f5.com](udf.f5.com), click **Blueprints**, then find "SDE NGINX Plus R34 Upskilling" and **Deploy** it.
+Log in to [udf.f5.com](https://udf.f5.com), click **Blueprints**, then find "SDE NGINX Plus R34 Upskilling" and **Deploy** it.
 
 ![UDF Start](media/5-oidc/udf-start.png)
 
@@ -317,12 +317,6 @@ To configure the server, we'll set the following in an `nginx.conf` configuratio
 2. Click **NGINX Plus R34 (Part 2)**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
 3. Change to the ubuntu user: `su ubuntu - `
 4. Switch to the _oidc-as_ directory in ubuntu's homedir: `cd /home/ubuntu/oidc`
-
-1. Navigate to the Deployment, then click **Components**.
-2. Click **NGINX Plus R34 (Part 2)**, then **Details** >> **Access** >> **Web Shell** to open a terminal.
-3. Change to the ubuntu user: ```su ubuntu - ```
-4. Switch to the *oidc-as* directory in ubuntu's homedir: ```cd /home/ubuntu/oidc```
-
 
 Review the [documentation](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-oidc/) and set the configuration with the values above.
 
@@ -420,7 +414,7 @@ Let's now browse to the web service and observe what happens.
 
 In these first few steps, NGINX has performed a DNS lookup on the `oidc-provider hostname`, visited the `well-known` endpoint, and redirected the end user's Firefox client to the Authorize endpoint with a [*nonce*](https://en.wikipedia.org/wiki/Cryptographic_nonce). Next, the Firefox browser follows the redirect.
 
-Observe the result from these events the Authentication Server terminal
+Observe the result from these events on the Authentication Server terminal
 
 <Collapsible title="Example Authentication Server Log - NGINX Hits Metadata Endpoint">
 
