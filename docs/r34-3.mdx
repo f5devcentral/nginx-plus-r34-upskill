@@ -120,7 +120,7 @@ http {
 
 Multi-domain servers with certificates generated or mapped dynamically based on `$ssl_server_name`.
 
-#### Example Configuration: Dynamic Certificate Loading
+#### Example Configuration: Dynamic Certificate Caching
 
 ```nginx
 http {
@@ -194,21 +194,7 @@ events {
 - **When to Use**:
   - Use this directive if changes to disk-based SSL objects (e.g., certificates, keys) require full reloading without retaining previously cached data after configuration reloads.
 
-### Lab
-
-Let's now move on to the lab portion of this use case. We will be using two different systems for this use case.
-1. **NGINX Plus R34 (Part 2)**: This is the NGINX Plus instance
-1. **Jumphost**: This is where we will be running `curl` for testing.
-
-You will have 2 windows for each of these systems. To access them, follow the instructions below.
-
-1. Go to [UDF](https://udf.f5.com/)
-1. Go to your **SDE NGINX Plus R34 Upskilling** deployment.
-1. Find **NGINX Plus R34 (Part 2)** under the **Systems** section.
-1. Open up a console connection by clicking on **ACCESS** > **SSH** or **WEB SHELL**
-1. Repeat steps 2 - 4 but on the **Jumphost** System
-
-**Ensure Cache Clearing**:
+#### Ensure Cache Clearing
 
 Perform two reloads to confirm complete clearing:
 
@@ -223,9 +209,25 @@ Alternatively, restart the service:
 sudo systemctl restart nginx
 ```
 
+### Lab
+
+Let's now move on to the lab portion of this use case. We will be using two different systems for this use case.
+
+1. **NGINX Plus R34 (Part 2)**: This is the NGINX Plus instance
+
+2. **Jumphost**: This is where we will be running `curl` for testing.
+
+You will have 2 windows for each of these systems. To access them, follow the instructions below.
+
+1. Go to [UDF](https://udf.f5.com/)
+1. Go to your **SDE NGINX Plus R34 Upskilling** deployment.
+1. Find **NGINX Plus R34 (Part 2)** under the **Systems** section.
+1. Open up a console connection by clicking on **ACCESS** > **SSH** or **WEB SHELL**
+1. Repeat steps 2 - 4 but on the **Jumphost** System
+
 #### Test Static Certificate Caching
 
-1. **Send a Request**:
+1. **Send a Request on the Jumphost**:
 
    ```bash
    curl -v https://sslcaching.lab.f5npi.net # Use the -v option in curl to see more detail on the SSL handshake
@@ -281,17 +283,53 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
 
 1. **Set Up**:
 
-   - Configure dynamic SSL loading using `$ssl_server_name`.
+   - Configure dynamic SSL caching using `$ssl_server_name`. Refer to the example in the [Dynamic Certificate Caching](#example-configuration-dynamic-certificate-caching) section.
+
+   - Edit `/etc/nginx/sslcaching.conf` to configure the certificate and key as variables. Then configure the `ssl_certificate_cache` and define the caching parameters.
+
+      ```bash
+      vi /etc/nginx/conf.d/sslcaching.conf
+      ```
+
+      <Collapsible title="Example Configuration">
+
+      ```nginx
+      server {
+          listen 443 ssl;
+          server_name lab.sslcaching.f5npi.net.net;
+
+          # Dynamically load certificates based on $ssl_server_name
+          ssl_certificate /etc/nginx/ssl/$ssl_server_name.pem;
+          ssl_certificate_key /etc/nginx/ssl/$ssl_server_name.key;
+
+          ssl_certificate_cache max=64 inactive=30s valid=5m; # Enable caching for dynamic certificates
+
+          location / {
+              root /var/www/html;
+              index index.html;
+          }
+      }
+      ```
+
+      </Collapsible>
+
+   - Save and close the file
+
+      ```bash
+      Press "Esc" to ensure you are in command mode
+      Type ":wq" and press "Enter"
+      ```
+
    - Run the command below to set the `$ssl_server_name` variable.
 
       ```bash
       source /etc/environment
       ```
 
-2. **Rename Certificate:**
+2. **Reload NGINX**
 
    ```bash
-   sudo mv /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.pem.bak
+   sudo systemctl reload nginx
    ```
 
 3. **Test with** `curl` from the **Jumphost**
@@ -300,9 +338,25 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
    curl -v https://sslcaching.lab.f5npi.net
    ```
 
-During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes,
-NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future
-requests. However, since we removed the certificate it should fail and log an error message.
+4. **Rename Certificate:**
+
+   ```bash
+   sudo mv /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.pem.bak
+   ```
+
+5. **Test with** `curl` from the **Jumphost**
+
+   ```bash
+   curl -v https://sslcaching.lab.f5npi.net
+   ```
+
+   While testing, watch how NGINX uses cached certificates to handle repeat requests. Once the valid time configured in the caching parameters passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests. However, since we removed the certificate it should fail and log an error message.
+
+6. **Check the NGINX error logs**
+
+   ```bash
+   tail /var/log/nginx/error.log
+   ```
 
 ### Best Practices
 
