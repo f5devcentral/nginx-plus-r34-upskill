@@ -283,9 +283,9 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
 
 1. **Set Up**:
 
-   - Configure dynamic SSL caching using `$ssl_server_name`. Refer to the example in the [Dynamic Certificate Caching](#### Example Configuration: Dynamic Certificate Caching) section.
+   - Configure dynamic SSL caching using `$ssl_server_name`. Refer to the example in the [Dynamic Certificate Caching](example-configuration-dynamic-certificate-caching) section.
 
-   - Edit `/etc/nginx/sslcaching.conf` to configure the certificate and key as variables. The configure the `ssl_certificate_cache` and define the parameters.
+   - Edit `/etc/nginx/sslcaching.conf` to configure the certificate and key as variables. Then configure the `ssl_certificate_cache` and define the caching parameters.
 
       ```bash
       vi /etc/nginx/conf.d/sslcaching.conf
