@@ -227,7 +227,7 @@ You will have 2 windows for each of these systems. To access them, follow the in
 
 #### Test Static Certificate Caching
 
-1. **Send a Request**:
+1. **Send a Request on the Jumphost**:
 
    ```bash
    curl -v https://sslcaching.lab.f5npi.net # Use the -v option in curl to see more detail on the SSL handshake
@@ -283,7 +283,7 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
 
 1. **Set Up**:
 
-   - Configure dynamic SSL caching using `$ssl_server_name`. Refer to the example in the [Dynamic Certificate Caching](example-configuration-dynamic-certificate-caching) section.
+   - Configure dynamic SSL caching using `$ssl_server_name`. Refer to the example in the [Dynamic Certificate Caching](#example-configuration-dynamic-certificate-caching) section.
 
    - Edit `/etc/nginx/sslcaching.conf` to configure the certificate and key as variables. Then configure the `ssl_certificate_cache` and define the caching parameters.
 
@@ -316,8 +316,8 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
    - Save and close the file
 
       ```bash
-      Press `Esc` to ensure you are in command mode
-      Type `:wq` and press `Enter`
+      Press "Esc" to ensure you are in command mode
+      Type ":wq" and press "Enter"
       ```
 
    - Run the command below to set the `$ssl_server_name` variable.
