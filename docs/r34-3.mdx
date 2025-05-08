@@ -194,6 +194,20 @@ events {
 - **When to Use**:
   - Use this directive if changes to disk-based SSL objects (e.g., certificates, keys) require full reloading without retaining previously cached data after configuration reloads.
 
+### Lab
+
+Let's now move on to the lab portion of this use case. We will be using two different systems for this use case.
+1. **NGINX Plus R34 (Part 2)**: This is the NGINX Plus instance
+1. **Jumphost**: This is where we will be running `curl` for testing.
+
+You will have 2 windows for each of these systems. To access them, follow the instructions below.
+
+1. Go to [UDF](https://udf.f5.com/)
+1. Go to your **SDE NGINX Plus R34 Upskilling** deployment.
+1. Find **NGINX Plus R34 (Part 2)** under the **Systems** section.
+1. Finally open up a console connection by clicking on **ACCESS** > **SSH** or **WEB SHELL**
+1. Repeat steps 2 - 4 but on the **Jumphost** System.
+
 **Ensure Cache Clearing**:
 
 Perform two reloads to confirm complete clearing:
@@ -223,13 +237,13 @@ sudo systemctl restart nginx
    sudo mv /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/fullchain.bak
    ```
 
-1. **Observe Behavior**
+1. **Observe Behavior** from the **Jumphost**
 
    - The server continues responding because NGINX is using the cached SSL context.
    - Test with `curl`:
 
    ```bash
-   curl -v https://sslcaching.lab.5npi.net 
+   curl -v https://sslcaching.lab.f5npi.net
    ```
 
 1. **Reload NGINX and check the NGINX error logs:**
@@ -237,10 +251,31 @@ sudo systemctl restart nginx
    ```bash
    sudo systemctl reload nginx
 
-   cat /var/log/nginx/error.log
+   tail /var/log/nginx/error.log
    ```
 
-During the reload process, NGINX validates its configuration and checks for the physical availability of certificate files specified in the settings. If the files are missing or inaccessible, the reload will fail because NGINX requires these files to be present to recreate the SSL contexts. This ensures that any changes to the configuration are properly validated before being applied.
+During the reload process, NGINX validates its configuration and checks for the physical availability of certificate
+files specified in the settings. If the files are missing or inaccessible, the reload will fail because NGINX requires
+these files to be present to recreate the SSL contexts. This ensures that any changes to the configuration are properly
+validated before being applied.
+
+<Collapsible title="Example Error Logs">
+
+```shell
+ubuntu@plus2:~$ tail /var/log/nginx/error.log
+2025/05/08 06:23:43 [notice] 1205#1205: exit
+2025/05/08 06:23:43 [notice] 554#554: signal 17 (SIGCHLD) received from 1205
+2025/05/08 06:23:43 [notice] 554#554: worker process 1204 exited with code 0
+2025/05/08 06:23:43 [notice] 554#554: worker process 1205 exited with code 0
+2025/05/08 06:23:43 [notice] 554#554: signal 29 (SIGIO) received
+2025/05/08 06:23:43 [info] 1214#1214: usage report was sent
+2025/05/08 06:24:11 [info] 1215#1215: *10 client 10.1.1.7 closed keepalive connection
+2025/05/08 06:34:57 [notice] 554#554: signal 1 (SIGHUP) received from 1249, reconfiguring
+2025/05/08 06:34:57 [notice] 554#554: reconfiguring
+2025/05/08 06:34:57 [emerg] 554#554: cannot load certificate "/etc/nginx/ssl/fullchain.pem": BIO_new_file() failed (SSL: error:80000002:system library::No such file or directory:calling fopen(/etc/nginx/ssl/fullchain.pem, r) error:10000080:BIO routines::no such file)
+```
+
+</Collapsible>
 
 #### Test Dynamic Certificate Caching
 
@@ -249,23 +284,26 @@ During the reload process, NGINX validates its configuration and checks for the 
    - Configure dynamic SSL loading using `$ssl_server_name`.
    - Run the command below to set the `$ssl_server_name` variable.
 
-     ```bash
+      ```bash
       source /etc/environment
       ```
 
 2. **Rename Certificate:**
 
    ```bash
-   sudo mv /etc/nginx/ssl/sslcaching.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.bak
+   sudo mv /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.bak
+           /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem
    ```
 
-3. **Test with** `curl`:
+3. **Test with** `curl` from the **Jumphost**
 
    ```bash
-   curl -v https://sslcaching.lab.5npi.net
+   curl -v https://sslcaching.lab.f5npi.net
    ```
 
-During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests. However, since we removed the certificate it should fail and log an error message.
+During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes,
+NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future
+requests. However, since we removed the certificate it should fail and log an error message.
 
 ### Best Practices
 

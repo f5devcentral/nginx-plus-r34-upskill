@@ -36,7 +36,7 @@ Below is a diagram showing an example environment of how this would look like.
 
 ### Forward Proxy
 
-The forward proxy is already an existing piece thats already installed. If you are interested you can expand the box
+The forward proxy is an existing piece thats already installed. If you are interested you can expand the box
 below.
 
 <Collapsible title="HTTP Forward Proxy Details">
@@ -116,17 +116,17 @@ ubuntu@plus1:~$ sudo cat /var/log/nginx/error.log
 
 ### Configuration (Forward Proxy)
 
-Again, a forward proxy is already configured at **forward-proxy.local**, listening on port 8888.
+Again, a forward proxy is already configured at **forward-proxy.local**, listening on port **8888**.
 
-Now let's go ahead and configure this instance to use a forward proxy. Add the following line to the **mgmt** section
-of `/etc/nginx.conf`:
+Now let's go ahead and configure this instance to use this forward proxy. Add the following line to the **mgmt** section
+in the `/etc/nginx/nginx.conf` file:
 
 ```shell
    proxy forward-proxy.local:8888;
 ```
 
-You may also want to increase the interval so NGINX Plus tries to submit the E&V report more often for error log
-verbose in this lab. Below is a snippet of setting the **interval** parameter.
+You may also want to increase the `interval` so NGINX Plus tries to submit the E&V report more often
+to increase the error log verbosity in this lab. Below is a snippet of setting the **interval** parameter.
 
 ```shell
     usage_report endpoint=product.connect.nginx.com interval=5s;
@@ -134,7 +134,7 @@ verbose in this lab. Below is a snippet of setting the **interval** parameter.
 
 You can take a look at the **mgmt** example config below.
 
-<Collapsible title="Example NGINX Config">
+<Collapsible title="Example of Full NGINX Config">
 
 ```shell
 mgmt {
@@ -168,6 +168,15 @@ You can now confirm success in the NGINX Error log:
 ```shell
 sudo tail /var/log/nginx/error.log
 ```
+
+Notice the following log message which indicates the report being sent.
+
+```shell
+. . .
+2025/03/25 17:15:15 [info] 1029#1029: usage report was sent
+```
+
+You can also view an example of the full output from the NGINX error logs below.
 
 <Collapsible title="Example output">
 
