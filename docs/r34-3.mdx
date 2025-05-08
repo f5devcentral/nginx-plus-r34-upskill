@@ -10,7 +10,7 @@ This demo illustrates an example configuration for SSL certificate caching
 support that is further extended in the R34 release. This builds on the
 previously added SSL certifcate caching support that was added in 2024.
 
-Blog post: https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations.
+[Blog post: Optimizing Resource Usage for Complex SSL Configurations](https://blog.nginx.org/blog/optimizing-resource-usage-for-complex-ssl-configurations)
 
 ## Demo Lab
 
@@ -214,7 +214,7 @@ sudo systemctl restart nginx
 1. **Send a Request**:
 
    ```bash
-   curl -v https://sslcaching.lab.f5npi.net
+   curl -v https://sslcaching.lab.f5npi.net # Use the -v option in curl to see more detail on the SSL handshake
    ```
 
 1. **Rename Certificate:**
@@ -226,6 +226,11 @@ sudo systemctl restart nginx
 1. **Observe Behavior**
 
    - The server continues responding because NGINX is using the cached SSL context.
+   - Test with `curl`:
+
+   ```bash
+   curl -v https://sslcaching.lab.5npi.net 
+   ```
 
 1. **Reload NGINX and check the NGINX error logs:**
 
@@ -251,13 +256,13 @@ During the reload process, NGINX validates its configuration and checks for the 
 2. **Rename Certificate:**
 
    ```bash
-   sudo mv /etc/nginx/ssl/lab.sslcaching.f5npi.net.pem /etc/nginx/ssl/lab.sslcaching.f5npi.net.bak
+   sudo mv /etc/nginx/ssl/sslcaching.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.bak
    ```
 
 3. **Test with** `curl`:
 
    ```bash
-   curl https://sslcaching.lab.5npi.net # Use the -v option in curl to see more detail on the SSL handshake
+   curl -v https://sslcaching.lab.5npi.net
    ```
 
 During the test, watch how NGINX uses cached certificates to handle repeat requests. After the valid time passes, NGINX will try to load the certificates from disk again, making sure any updates to the files are used for future requests. However, since we removed the certificate it should fail and log an error message.
