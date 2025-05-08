@@ -205,8 +205,8 @@ You will have 2 windows for each of these systems. To access them, follow the in
 1. Go to [UDF](https://udf.f5.com/)
 1. Go to your **SDE NGINX Plus R34 Upskilling** deployment.
 1. Find **NGINX Plus R34 (Part 2)** under the **Systems** section.
-1. Finally open up a console connection by clicking on **ACCESS** > **SSH** or **WEB SHELL**
-1. Repeat steps 2 - 4 but on the **Jumphost** System.
+1. Open up a console connection by clicking on **ACCESS** > **SSH** or **WEB SHELL**
+1. Repeat steps 2 - 4 but on the **Jumphost** System
 
 **Ensure Cache Clearing**:
 
@@ -291,7 +291,7 @@ ubuntu@plus2:~$ tail /var/log/nginx/error.log
 2. **Rename Certificate:**
 
    ```bash
-   sudo mv /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.bak
+   sudo mv /etc/nginx/ssl/sslcaching.lab.f5npi.net.pem /etc/nginx/ssl/sslcaching.f5npi.net.pem.bak
    ```
 
 3. **Test with** `curl` from the **Jumphost**
